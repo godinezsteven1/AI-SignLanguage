@@ -1,5 +1,3 @@
-### **README.md Example:**
-
 # AI Sign Language Project
 
 ## Overview
