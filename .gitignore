@@ -1,0 +1,25 @@
+# Virtual Environment
+fai_project_env/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# VS Code settings
+.vscode/
+
+# MacOS Finder files
+.DS_Store
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Dependency directories
+/venv/
+/env/
+
+# Dataset (if large files are included)
+datasets/
+
+# Other system-specific files
+*.swp
