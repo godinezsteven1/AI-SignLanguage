@@ -35,7 +35,7 @@ pip install -r requirements.txt
 ```
 
 ### 4. Verify Setup
-To make sure everything is working, try running a basic script, such as `hand_tracking.py`, to ensure TensorFlow and Mediapipe are installed correctly.
+To make sure everything is working, try running the `hand_tracking.py` script to ensure TensorFlow and Mediapipe are installed correctly.
 
 ```bash
 python hand_tracking.py
