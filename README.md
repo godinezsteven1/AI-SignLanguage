@@ -48,15 +48,3 @@ If everything is set up correctly, you should see a window showing hand tracking
 Once you’ve set up the environment, you can start working on the project by running the appropriate scripts:
 - `hand_tracking.py`: For hand tracking and feature extraction.
 - Other scripts for data preparation, model training, and NLP integration will be added as development progresses.
-
-## Notes
-- Make sure to **always activate the virtual environment** before running the project.
-- If you encounter issues with the camera on macOS, go to **System Preferences** > **Security & Privacy** > **Camera** and grant access to your terminal/VS Code.
-
-## Contributing
-Feel free to fork the repo and submit pull requests for improvements, bug fixes, or new features!
-
----
-
-### **Git Ignore**
-We’ve included a `.gitignore` file to ensure we don't track unnecessary files such as the virtual environment or large dataset files. Please don’t commit changes to these ignored files.
