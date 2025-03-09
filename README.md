@@ -1,6 +1,5 @@
 ### **README.md Example:**
 
-```markdown
 # AI Sign Language Project
 
 ## Overview
@@ -13,7 +12,6 @@ Clone the repository to your local machine using Git:
 ```bash
 git clone https://github.com/godinezsteven1/AI-SignLanguage.git
 cd AI-SignLanguage
-```
 
 ### 2. Create a Virtual Environment
 Create a virtual environment to manage project dependencies:
