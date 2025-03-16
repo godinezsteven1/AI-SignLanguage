@@ -19,7 +19,8 @@ __pycache__/
 /env/
 
 # Dataset (if large files are included)
-datasets/
+data/asl
+models/asl_model.h5
 
 # Other system-specific files
 *.swp
