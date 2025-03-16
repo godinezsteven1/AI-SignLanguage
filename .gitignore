@@ -19,7 +19,10 @@ __pycache__/
 /env/
 
 # Dataset (if large files are included)
-datasets/
+data/
+
+# models (can be very large)
+models/
 
 # Other system-specific files
 *.swp
