@@ -1,4 +1,5 @@
 import cv2
+import os
 import mediapipe as mp
 import numpy as np
 from tensorflow.keras.models import load_model
@@ -8,10 +9,10 @@ hands = mp_hands.Hands()
 mp_draw = mp.solutions.drawing_utils
 
 # Load the trained model
-model = load_model('../models/asl_model.h5')
+model = load_model('../models/full_asl_model.h5')
 
-class_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 
-                'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'delete', 'space', 'nothing']
+dataset_path = "../data/asl"
+class_labels = sorted(os.listdir(dataset_path))
 
 cap = cv2.VideoCapture(0)
 while cap.isOpened():
@@ -26,10 +27,10 @@ while cap.isOpened():
             mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
             # Extract the hand region
-            x_min = int(min([landmark.x for landmark in hand_landmarks.landmark]) * frame.shape[1])
-            x_max = int(max([landmark.x for landmark in hand_landmarks.landmark]) * frame.shape[1])
-            y_min = int(min([landmark.y for landmark in hand_landmarks.landmark]) * frame.shape[0])
-            y_max = int(max([landmark.y for landmark in hand_landmarks.landmark]) * frame.shape[0])
+            x_min = int(min([landmark.x for landmark in hand_landmarks.landmark]) * frame.shape[1] - 100)
+            x_max = int(max([landmark.x for landmark in hand_landmarks.landmark]) * frame.shape[1] + 100)
+            y_min = int(min([landmark.y for landmark in hand_landmarks.landmark]) * frame.shape[0] - 100)
+            y_max = int(max([landmark.y for landmark in hand_landmarks.landmark]) * frame.shape[0] + 100)
             
             # Ensure the bounding box is valid
             if x_min < 0: x_min = 0
@@ -41,6 +42,7 @@ while cap.isOpened():
 
             # Check if hand_region is not empty
             if hand_region.size > 0:
+                print(f"Hand region shape: {hand_region.shape}")
                 # Preprocess the hand region for prediction
                 hand_region = cv2.resize(hand_region, (200, 200))  # Resize to match model input
                 hand_region = hand_region / 255.0  # Normalize
@@ -48,6 +50,7 @@ while cap.isOpened():
 
                 # Make prediction
                 predictions = model.predict(hand_region)
+                print(f"Predictions: {predictions}")
                 predicted_class = np.argmax(predictions, axis=1)[0]
                 predicted_letter = class_labels[predicted_class]  # Use the defined class labels
 

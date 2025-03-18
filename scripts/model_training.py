@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
 # Set up paths
-data_dir = '../data/asl_mini'  # Update this to your dataset path
+data_dir = '../data/asl'  # Update this to your dataset path
 img_size = (200, 200)
 
 # Data augmentation and preprocessing
@@ -46,4 +46,4 @@ model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accur
 model.fit(train_generator, validation_data=validation_generator, epochs=10)
 
 # Save the model
-model.save('models/asl_model.h5')
+model.save('../models/full_asl_model2.h5')
