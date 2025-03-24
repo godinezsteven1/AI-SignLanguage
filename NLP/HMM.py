@@ -2,3 +2,39 @@
 #given hidden states of user input 
 # uses states observations emission probabilities for the HMM 
 # uses Viterbi algorithm, a brute force algo, to find the most likely sequence of words 
+
+
+class HMM:
+    def __init__(self, states, startProb, transitionProb, emissionProb):
+        self.states = states
+        self.startProb = startProb
+        self.transitionProb = transitionProb
+        self.emissionProb = emissionProb
+
+    #basic implementation of viterbi, tailor later
+    def viterbi(self, obs):
+        V = [{}] #probability at each step 
+        path = {} #sequence 
+
+        for y in states:
+            V[0][y] = startProb[y] * emissionProb[y][obs[0]] #first observation 
+            path[y] = [y]
+        for t in range(1,len(obs)):
+            V.append({})
+            newPath = {}
+            for y in states:
+                # account for all previous 
+                (prob, state) = max([(V[t - 1][y0] * transitionProb[y0][y] * emissionProb[y0][obs[t]], y0) for y0 in states])
+                #store max prob 
+                V[t][y] = prob
+                newPath[y] = path[state] + [y] #updates path 
+                path = newPath # updates path directory 
+            (prob, state) = max([(V[-1][y], y) for y in states]) # state w highest prob in final observation 
+            #return (prob, path[state]) # return prob w its state
+            #print(prob, path[state]) # print 
+            return path[state] # returns most likely obvservation sequence 
+            
+    #states = all states of model?
+    #obs = user input
+    #prob yet to be calculated 
+                
