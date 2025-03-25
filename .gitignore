@@ -20,7 +20,7 @@ __pycache__/
 
 # Dataset (if large files are included)
 data/
-models/
+models/full_asl_model.h5
 
 # Other system-specific files
 *.swp
