@@ -17,7 +17,7 @@ class_names = []
 
 # Loop through each language directory
 for language in sorted(os.listdir(dataset_path)):
-    if language == "asl":  # Skip the asl_mini directory
+    if language == "asl":  # Skip the asl directory
         continue
     language_path = os.path.join(dataset_path, language)
     if os.path.isdir(language_path):  # Check if it's a directory
