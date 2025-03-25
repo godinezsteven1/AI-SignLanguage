@@ -9,7 +9,7 @@ mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=True, max_num_hands=1, min_detection_confidence=0.5)
 
 # Load the trained model
-model = load_model("../models/full_sign_language_model2.h5")
+model = load_model("../models/full_model_with_cropping.h5")
 
 # Define class names
 dataset_path = "../data"  # Update to the parent directory containing ASL and DGS datasets
@@ -17,7 +17,7 @@ class_names = []
 
 # Loop through each language directory
 for language in sorted(os.listdir(dataset_path)):
-    if language == "asl":  # Skip the asl directory
+    if language == "asl_mini":  # Skip the asl directory
         continue
     language_path = os.path.join(dataset_path, language)
     if os.path.isdir(language_path):  # Check if it's a directory
