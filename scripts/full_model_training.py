@@ -12,7 +12,7 @@ mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(static_image_mode=True, max_num_hands=1, min_detection_confidence=0.5)
 
 # Set up paths
-data_dirs = ['../data/asl_mini']  # Updated to include all datasets
+data_dirs = ['../data/asl_mini', '../data/dgs', '../data/lse']  # Updated to include all datasets
 
 # Verify images and remove invalid ones
 for data_dir in data_dirs:
@@ -258,4 +258,4 @@ history = model.fit(
 )
 
 # Save the model
-model.save('../models/asl_model2.h5')
+model.save('../models/asl_model_with_cropping.h5')
