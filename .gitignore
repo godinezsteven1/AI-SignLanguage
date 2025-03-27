@@ -24,3 +24,7 @@ models/full_asl_model.h5
 
 # Other system-specific files
 *.swp
+
+
+# file with private keys/reddit Keys for scraper
+.env
