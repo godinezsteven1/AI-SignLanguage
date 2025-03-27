@@ -10,12 +10,17 @@ from collections import Counter, defaultdict
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+envPath = os.path.join(os.path.dirname(__file__), '..', 'secureClientInfo.env') #your file name here 
+load_dotenv(envPath)
 
 client_id = os.environ.get("CLIENT_ID")
 client_secret = os.environ.get("CLIENT_SECRET")
 user_agent = os.environ.get("USER_AGENT")
 postLimit = os.environ.get("POST_LIMIT")
+print("CLIENT_ID =", client_id)
+print("CLIENT_SECRET =", client_secret)
+print("USER_AGENT =", user_agent)
+print("POST_LIMIT =", postLimit)
 
 
 #create reddit object 
@@ -27,7 +32,7 @@ def redditInit(client_id, client_secret, user_agent):
     return reddit
 
 #scrape mass reddit for probabilities
-def redditScraper(reddit,subreddit_name = "AskReddit", postLimit):
+def redditScraper(reddit,subreddit_name = "AskReddit"):
     text = [] 
     subreddit = reddit.subreddit(subreddit_name)
 
@@ -112,7 +117,7 @@ def emissionProbHmm(textFile):
 def main():
 
     reddit = redditInit(client_id, client_secret, user_agent)
-    text = redditScraper(reddit, subreddit_name="AskReddit", postLimit)
+    text = redditScraper(reddit, subreddit_name="AskReddit")
 
     startProb = startProbHMM(text)
     transitionProb = transProbHMM(text)
@@ -125,6 +130,12 @@ def main():
 #scripting use 
 if __name__ == "__main__":
     sProb, tProb, eProb = main()
+    print("start prob")
+    print(sprob)
+    print("trans prob")
+    print(tProb)
+    print("emission prob")
+    print(eProb)
     
 
 
