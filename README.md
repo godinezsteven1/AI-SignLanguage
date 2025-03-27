@@ -47,3 +47,26 @@ If everything is set up correctly, you should see a window showing hand tracking
 Once you’ve set up the environment, you can start working on the project by running the appropriate scripts:
 - `hand_tracking.py`: For hand tracking and feature extraction.
 - Other scripts for data preparation, model training, and NLP integration will be added as development progresses.
+
+------ 
+## Environment Variables Setup
+
+This project uses environment variables for sensitive configuration. A template file `.env.example` is provided in the repository. Follow these steps to create your own `.env` file:
+
+1. **Copy the template file:**
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Fill in information:**
+```bash
+CLIENT_ID=your_client_id_here
+CLIENT_SECRET=your_client_secret_here
+USER_AGENT=your_user_agent_here
+POST_LIMIT=NUMBER_LIMIT_HERE
+```
+In order to get this information please go on Reddit, click on your avatar → User Settings → scroll down to the "Apps" section. You can manage and create apps from there.
+
+ 
+   
