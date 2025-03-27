@@ -28,3 +28,4 @@ models/full_asl_model.h5
 
 # file with private keys/reddit Keys for scraper
 .env
+*.env
