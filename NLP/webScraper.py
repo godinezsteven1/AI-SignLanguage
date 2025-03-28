@@ -9,6 +9,7 @@ import re
 from collections import Counter, defaultdict
 import os
 from dotenv import load_dotenv
+import json
 
 envPath = os.path.join(os.path.dirname(__file__), '..', 'secureClientInfo.env') #your file name here 
 load_dotenv(envPath)
@@ -17,10 +18,12 @@ client_id = os.environ.get("CLIENT_ID")
 client_secret = os.environ.get("CLIENT_SECRET")
 user_agent = os.environ.get("USER_AGENT")
 postLimit = os.environ.get("POST_LIMIT")
+postLimit = int(postLimit)
 print("CLIENT_ID =", client_id)
 print("CLIENT_SECRET =", client_secret)
 print("USER_AGENT =", user_agent)
 print("POST_LIMIT =", postLimit)
+#postLimit = 5
 
 
 #create reddit object 
@@ -35,22 +38,27 @@ def redditInit(client_id, client_secret, user_agent):
 def redditScraper(reddit,subreddit_name = "AskReddit"):
     text = [] 
     subreddit = reddit.subreddit(subreddit_name)
+    print(subreddit_name)
 
     #for each post skip over NSFW content,collect the text 
-    for sub in subreddit.best(limit=postLimit):
+    for sub in subreddit.top(limit=postLimit):
+        print("reached loop")
         if sub.over_18:
+            print("sub.over_18")
             continue 
         if sub.selftext:
+            print("reached sub.selftext")
             text.append(sub.selftext) #look at doc for this how is it boolean and string at same time
         
         #loop in comments be careful w deleted/removed comments 
-        sub.comments.replace_more(limit=None)
-        for comment in sub.comments.list(): #comments as list
+        sub.comments.replace_more(limit=0)
+        for comment in sub.comments: #comments as list
             if comment is None or comment.body is None: # skip null pointers
                 continue
-            if comment.over_18: #not sure if this func also works for comment bodies thats why its separated 
-                continue 
+            #if comment.over_18: #not sure if this func also works for comment bodies thats why its separated 
+            #    continue  #does not exist 
             text.append(comment.body)
+            print(comment.body)
     return text
 
 #clean and split text
@@ -105,7 +113,7 @@ def transProbHMM(textFile):
 
 
 # emissions 
-def emissionProbHmm(textFile):
+def emissionProbHMM(textFile):
     frequency = frequencyMaker(textFile)
     emissionProb = {}
     for word in frequency:
@@ -123,19 +131,26 @@ def main():
     transitionProb = transProbHMM(text)
     emissionProb = emissionProbHMM(text)
 
+    with open("startProb.json", "w") as f:
+        json.dump(startProb, f)
 
-    # Return them (no printing, as requested)
+    with open("transitionProb.json", "w") as f:
+        json.dump(transitionProb, f)
+
+    with open("emissionProb.json", "w") as f:
+        json.dump(emissionProb, f)
+
     return startProb, transitionProb, emissionProb
 
 #scripting use 
 if __name__ == "__main__":
     sProb, tProb, eProb = main()
     print("start prob")
-    print(sprob)
+    #print(sProb)
     print("trans prob")
-    print(tProb)
+    #print(tProb)
     print("emission prob")
-    print(eProb)
+    #print(eProb)
     
 
 
