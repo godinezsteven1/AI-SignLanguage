@@ -19,8 +19,8 @@ client_secret = os.environ.get("CLIENT_SECRET")
 user_agent = os.environ.get("USER_AGENT")
 postLimit = os.environ.get("POST_LIMIT")
 postLimit = int(postLimit)
-#redditName = "AskReddit"
-redditName = "neu"
+redditName = "AskReddit"
+#redditName = "neu"
 print("CLIENT_ID =", client_id)
 print("CLIENT_SECRET =", client_secret)
 print("USER_AGENT =", user_agent)
@@ -195,6 +195,7 @@ def main():
 
     reddit = redditInit(client_id, client_secret, user_agent)
     text = redditScraper(reddit, subreddit_name=redditName)
+    print(f"confirmation, scanning {redditName}")
 
     # new counts 
     newStartCounts = countStart(text)          
@@ -222,7 +223,7 @@ def main():
     # update probabilities
     updatedStartProb = calcProbabilities(mergedStartCount)
     updatedTransProb = calcProbNested(mergedTransCount)
-    updatedEmissionProb = calcProbabilities(mergedEmissionCount)
+    updatedEmissionProb = {"start": calcProbabilities(mergedEmissionCount)}
 
     # file update with merge
     saveJSONFile(dict(mergedStartCount), "startCount.json")
@@ -233,6 +234,7 @@ def main():
     saveJSONFile(updatedStartProb, "startProb.json")
     saveJSONFile(updatedTransProb, "transitionProb.json")
     saveJSONFile(updatedEmissionProb, "emissionProb.json")
+    
 
     return updatedStartProb, updatedTransProb, updatedEmissionProb
 
