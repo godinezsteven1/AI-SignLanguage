@@ -85,16 +85,3 @@ if __name__ == "__main__":
 
 #1. needs to be higher probability --> dataset is not big enough probabilities are small 
 #2. needs to return people on reddit, sequence was not a incorrect one --> dataset is not big enough 
-
-
-
-
-
-
-
-
-
-
-
-
-
