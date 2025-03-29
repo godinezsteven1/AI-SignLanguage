@@ -19,6 +19,9 @@ client_secret = os.environ.get("CLIENT_SECRET")
 user_agent = os.environ.get("USER_AGENT")
 postLimit = os.environ.get("POST_LIMIT")
 postLimit = int(postLimit)
+commonStateLimit = 500
+#postLimit = 2 #for debug 
+#commonStateLimit = 10 # for debug
 redditName = "AskReddit"
 #redditName = "neu"
 print("CLIENT_ID =", client_id)
@@ -65,15 +68,16 @@ def redditScraper(reddit,subreddit_name = redditName):
 #clean and split text
 def cleanAndSplit(text):
     text = text.lower()
-    # only letters and spaces
+    # only letters and spaces chat wrote line under this, forgot to add to Original commit (comment)
     text = re.sub(r'[^a-z\s]', '', text)
     token = text.split()
     return token
 
+
+########
 #count and set frequency
 def frequencyMaker(text): 
     frequency = Counter()
-
     for sub in text:
         token = cleanAndSplit(sub)
         frequency.update(token)
@@ -95,7 +99,7 @@ def startProbHMM(textFile):
     totalCounter = sum(startCounter.values()) # should be totla or some 
     startProb = {word: count / totalCounter for word, count in startCounter.items()} # chat helped initialize this one liner
     return startProb
-
+#########
 
 
 
@@ -110,12 +114,13 @@ def startProbHMM(textFile):
 ##########################
 
 #same as startPorbHMM except doesn ot calc prob, returns counter 
-def countStart(textFile):
+def countStart(textFile, wordToState):
     startCounter = Counter()
     for words in textFile:
         token = cleanAndSplit(words)
         if token:
-            startCounter[token[0]] += 1
+            state = wordToState.get(token[0], "rare")
+            startCounter[state] += 1
     return startCounter
 
 # split into two funcs 
@@ -133,13 +138,14 @@ def countStart(textFile):
 #        transitionProb[w1] = {w2: count / total for w2, count in counter.items()} #chat helped initialize this one line
 #    return transitionProb
 
-def countTrans(textFile):
+def countTrans(textFile, wordToState):
     transCount = defaultdict(Counter)
     for words in textFile:
         token = cleanAndSplit(words)
-        for i in range(len(token) - 1):
-            w1, w2 = token[i], token[i + 1]
-            transCount[w1][w2] += 1
+        states = [wordToState.get(w, "rare") for w in token]
+        for i in range(len(states) - 1):
+            # increment the count of transitions from the current state to the next state
+            transCount[states[i]][states[i + 1]] += 1 #chat helped initialize this 
     return transCount
 
 
@@ -151,13 +157,17 @@ def countTrans(textFile):
 #    for word in frequency:
 #        emissionProb[word] = {word: 1.0} # why doesnt this work as a int? # leave as float. 
 #    return emissionProb
-def countEmission(textFile):
-    allWords = []
+def countEmission(textFile, wordToState):
+    emissionCount = defaultdict(Counter)
     for words in textFile:
-        word = cleanAndSplit(words)
-        allWords.extend(word)
-    return Counter(allWords)
+        token = cleanAndSplit(words)
+        for word in token:
+            state = wordToState.get(word, "rare")
+            emissionCount[state][word] += 1
+    return emissionCount
 
+
+##########
 def mergeCount(old, new):
         return old + new
 
@@ -166,17 +176,17 @@ def mergeCounters(old, new):
     for key, counter in new.items():
         merged[key].update(counter)
     return merged
+#############
+
 
 def calcProbabilities(counter):
     total = sum(counter.values())
     return {word: count / total for word, count in counter.items()} #from og startProbHMM
 
+
 def calcProbNested(nestCounter):
-    prob = {}
-    for key, counter in nestCounter.items():
-        total = sum(counter.values())
-        prob[key] = {word: count / total for word, count in counter.items()} #from og probability funcs
-    return prob
+    return {state: calcProbabilities(counter) for state, counter in nestCounter.items()} #chat streamlined previous code for nested d
+
 
 def loadJSONFile(name):
     #never pass one that does not exist but just in case
@@ -186,59 +196,55 @@ def loadJSONFile(name):
     else:
         print(f"file does not exist: {name}")
         return None
-    
+
+
+# gona stick away from the mergers for now
+# make file and indent this time
 def saveJSONFile(data, name):
     with open(name, "w") as f: #write
-        json.dump(data, f)
+        json.dump(data, f, indent=2)
 
+
+#pipeline 
 def main():
-
     reddit = redditInit(client_id, client_secret, user_agent)
     text = redditScraper(reddit, subreddit_name=redditName)
-    print(f"confirmation, scanning {redditName}")
 
-    # new counts 
-    newStartCounts = countStart(text)          
-    newTransCounts = countTrans(text)    
-    newEmissionCounts = countEmission(text)
+    freqCounter = Counter()
+    for sentence in text:
+        freqCounter.update(cleanAndSplit(sentence))
 
-    # load existing count if they exist
-    loadStartCount = loadJSONFile("startCount.json")
-    loadTransCount = loadJSONFile("transitionCount.json")
-    loadEmissionCount = loadJSONFile("emissionCount.json")
+    mostCommonStates = set([w for w, _ in freqCounter.most_common(commonStateLimit)]) 
+    wordToState = {w: ("common" if w in mostCommonStates else "rare") for w in freqCounter}
 
-    # if no exist intitialize 
-    if loadStartCount is None:
-        loadStartCount = {}
-    if loadTransCount is None:
-        loadTransCount = {}
-    if loadEmissionCount is None:
-        loadEmissionCount = {}
+    newStart = countStart(text, wordToState)
+    newTrans = countTrans(text, wordToState)
+    newEmission = countEmission(text, wordToState)
 
-    # merge old with new aka empty and non empty, or non and non
-    mergedStartCount = mergeCount(Counter(loadStartCount), newStartCounts)
-    mergedTransCount = mergeCounters(loadTransCount, newTransCounts)
-    mergedEmissionCount = mergeCount(Counter(loadEmissionCount), newEmissionCounts)
+    oldStart = loadJSONFile("startCount.json") or {}
+    oldTrans = loadJSONFile("transitionCount.json") or {}
+    oldEmission = loadJSONFile("emissionCount.json") or {}
 
-    # update probabilities
-    updatedStartProb = calcProbabilities(mergedStartCount)
-    updatedTransProb = calcProbNested(mergedTransCount)
-    updatedEmissionProb = {"start": calcProbabilities(mergedEmissionCount)}
+    mergedStart = mergeCount(Counter(oldStart), newStart)
+    mergedTrans = mergeCounters(defaultdict(Counter, oldTrans), newTrans)
+    #mergedEmission = mergeCount(Counter(oldEmission), newEmission) # old version 
+    mergedEmission = mergeCounters(defaultdict(Counter, oldEmission), newEmission)
 
-    # file update with merge
-    saveJSONFile(dict(mergedStartCount), "startCount.json")
-    saveJSONFile(mergedTransCount, "transitionCount.json")
-    saveJSONFile(dict(mergedEmissionCount), "emissionCount.json")
+    startProb = calcProbabilities(mergedStart)
+    transProb = calcProbNested(mergedTrans)
+    emissionProb = calcProbNested(mergedEmission)
 
-    #file update with probs
-    saveJSONFile(updatedStartProb, "startProb.json")
-    saveJSONFile(updatedTransProb, "transitionProb.json")
-    saveJSONFile(updatedEmissionProb, "emissionProb.json")
+    saveJSONFile(startProb, "startProb.json")
+    saveJSONFile(transProb, "transitionProb.json")
+    saveJSONFile(emissionProb, "emissionProb.json")
+    saveJSONFile(dict(mergedStart), "startCount.json")
+    saveJSONFile({k: dict(v) for k, v in mergedTrans.items()}, "transitionCount.json") # chat helped write this 
+    saveJSONFile(dict(mergedEmission), "emissionCount.json")
+
+    return startProb, transProb, emissionProb
+
+
     
-
-    return updatedStartProb, updatedTransProb, updatedEmissionProb
-
-    return startProb, transitionProb, emissionProb
 
 #scripting use 
 if __name__ == "__main__":

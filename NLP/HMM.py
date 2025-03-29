@@ -68,14 +68,15 @@ class HMM:
 
 if __name__ == "__main__":
     states = list(emissionProb.keys())
+    #print(states)
     HMModel = HMM(states, startProb, transitionProb, emissionProb)
     #constructing sentence with high probabilities given start, trans and emission 
     obs = ["people", "on", "reddit"]
 
-    (prob, bestPath) = HMModel.viterbi(obs)
-    print("obs sequence", obs)
-    print("best path", bestPath)
-    print("best path prob", prob)
+    #(prob, bestPath) = HMModel.viterbi(obs)
+    #print("obs sequence", obs)
+    #print("best path", bestPath)
+    #print("best path prob", prob) 
 
 #returns
 #2.6160889470241992e-23 ['people', 'reddit', 'is']
