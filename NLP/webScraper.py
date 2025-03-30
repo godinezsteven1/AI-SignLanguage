@@ -123,6 +123,10 @@ def countStart(textFile, wordToState):
             startCounter[state] += 1
     return startCounter
 
+#word emissions set to 1 
+def buildEmissionIdentity(wordSet):
+    return {word: {word: 1.0} for word in wordSet}
+
 # split into two funcs 
 # Prob(interpreted as dictionary of dictionary 
 #def transProbHMM(textFile):
@@ -210,16 +214,12 @@ def main():
     reddit = redditInit(client_id, client_secret, user_agent)
     text = redditScraper(reddit, subreddit_name=redditName)
 
-    freqCounter = Counter()
+    newStart = countStart(text)
+    newTrans = countTrans(text)
+
+    vocab = set()
     for sentence in text:
-        freqCounter.update(cleanAndSplit(sentence))
-
-    mostCommonStates = set([w for w, _ in freqCounter.most_common(commonStateLimit)]) 
-    wordToState = {w: ("common" if w in mostCommonStates else "rare") for w in freqCounter}
-
-    newStart = countStart(text, wordToState)
-    newTrans = countTrans(text, wordToState)
-    newEmission = countEmission(text, wordToState)
+        vocab.update(cleanAndSplit(sentence))
 
     oldStart = loadJSONFile("startCount.json") or {}
     oldTrans = loadJSONFile("transitionCount.json") or {}
@@ -227,21 +227,21 @@ def main():
 
     mergedStart = mergeCount(Counter(oldStart), newStart)
     mergedTrans = mergeCounters(defaultdict(Counter, oldTrans), newTrans)
-    #mergedEmission = mergeCount(Counter(oldEmission), newEmission) # old version 
-    mergedEmission = mergeCounters(defaultdict(Counter, oldEmission), newEmission)
+    mergedEmission = mergeCount(Counter(oldEmission), Counter({word: 1 for word in vocab}))
 
     startProb = calcProbabilities(mergedStart)
     transProb = calcProbNested(mergedTrans)
-    emissionProb = calcProbNested(mergedEmission)
+    emissionProb = buildEmissionIdentity(vocab)
 
     saveJSONFile(startProb, "startProb.json")
     saveJSONFile(transProb, "transitionProb.json")
     saveJSONFile(emissionProb, "emissionProb.json")
     saveJSONFile(dict(mergedStart), "startCount.json")
-    saveJSONFile({k: dict(v) for k, v in mergedTrans.items()}, "transitionCount.json") # chat helped write this 
+    saveJSONFile({k: dict(v) for k, v in mergedTrans.items()}, "transitionCount.json")
     saveJSONFile(dict(mergedEmission), "emissionCount.json")
 
     return startProb, transProb, emissionProb
+
 
 
     

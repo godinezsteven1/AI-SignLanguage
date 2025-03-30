@@ -50,7 +50,7 @@ class HMM:
                 # max path that ends in i (because its word word word i) with respect to
                 # max and get best path
                 (prob, prevState) = max((V[t-1][i0] * self.transitionProb.get(i0, {}).get(i, 1e-10) * #S_i -> S_j
-                     self.emissionProb[i0].get(obs[t], 1e-10), i0)  #emitting O_j at S_j
+                     self.emissionProb[i].get(obs[t], 1e-10), i0)  #emitting O_j at S_j
                     for i0 in self.states) # chat helped write logic from the max to down here 
                 #store givne max
                 V[t][i] = prob
@@ -73,10 +73,10 @@ if __name__ == "__main__":
     #constructing sentence with high probabilities given start, trans and emission 
     obs = ["people", "on", "reddit"]
 
-    #(prob, bestPath) = HMModel.viterbi(obs)
-    #print("obs sequence", obs)
-    #print("best path", bestPath)
-    #print("best path prob", prob) 
+    (prob, bestPath) = HMModel.viterbi(obs)
+    print("obs sequence", obs)
+    print("best path", bestPath)
+    print("best path prob", prob) 
 
 #returns
 #2.6160889470241992e-23 ['people', 'reddit', 'is']
