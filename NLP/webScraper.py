@@ -17,11 +17,11 @@ load_dotenv(envPath)
 client_id = os.environ.get("CLIENT_ID")
 client_secret = os.environ.get("CLIENT_SECRET")
 user_agent = os.environ.get("USER_AGENT")
-postLimit = os.environ.get("POST_LIMIT")
-postLimit = int(postLimit)
-commonStateLimit = 500
-#postLimit = 2 #for debug 
-#commonStateLimit = 10 # for debug
+#postLimit = os.environ.get("POST_LIMIT")
+#postLimit = int(postLimit)
+#commonStateLimit = 500
+postLimit = 2 #for debug 
+commonStateLimit = 10 # for debug
 redditName = "AskReddit"
 #redditName = "neu"
 print("CLIENT_ID =", client_id)
@@ -114,13 +114,12 @@ def startProbHMM(textFile):
 ##########################
 
 #same as startPorbHMM except doesn ot calc prob, returns counter 
-def countStart(textFile, wordToState):
+def countStart(textFile):
     startCounter = Counter()
-    for words in textFile:
-        token = cleanAndSplit(words)
-        if token:
-            state = wordToState.get(token[0], "rare")
-            startCounter[state] += 1
+    for sentence in textFile:
+        tokens = cleanAndSplit(sentence)
+        if tokens:
+            startCounter[tokens[0]] += 1
     return startCounter
 
 #word emissions set to 1 
@@ -142,14 +141,13 @@ def buildEmissionIdentity(wordSet):
 #        transitionProb[w1] = {w2: count / total for w2, count in counter.items()} #chat helped initialize this one line
 #    return transitionProb
 
-def countTrans(textFile, wordToState):
+def countTrans(textFile):
     transCount = defaultdict(Counter)
     for words in textFile:
         token = cleanAndSplit(words)
-        states = [wordToState.get(w, "rare") for w in token]
-        for i in range(len(states) - 1):
+        for i in range(len(token) - 1):
             # increment the count of transitions from the current state to the next state
-            transCount[states[i]][states[i + 1]] += 1 #chat helped initialize this 
+            transCount[token[i]][token[i + 1]] += 1 #chat helped initialize this 
     return transCount
 
 
@@ -217,28 +215,35 @@ def main():
     newStart = countStart(text)
     newTrans = countTrans(text)
 
-    vocab = set()
-    for sentence in text:
-        vocab.update(cleanAndSplit(sentence))
+    # Build vocabulary and word-to-state mapping
+    freqCounter = frequencyMaker(text)
+    mostCommonStates = set([w for w, _ in freqCounter.most_common(commonStateLimit)])
+    wordToState = {w: ("common" if w in mostCommonStates else "rare") for w in freqCounter}
 
+    newEmission = countEmission(text, wordToState)
+
+    # Load old data for merging
     oldStart = loadJSONFile("startCount.json") or {}
     oldTrans = loadJSONFile("transitionCount.json") or {}
     oldEmission = loadJSONFile("emissionCount.json") or {}
 
+    # Merge new + old counts
     mergedStart = mergeCount(Counter(oldStart), newStart)
     mergedTrans = mergeCounters(defaultdict(Counter, oldTrans), newTrans)
-    mergedEmission = mergeCount(Counter(oldEmission), Counter({word: 1 for word in vocab}))
+    mergedEmission = mergeCounters(defaultdict(Counter, oldEmission), newEmission)
 
+    # Convert to probabilities
     startProb = calcProbabilities(mergedStart)
     transProb = calcProbNested(mergedTrans)
-    emissionProb = buildEmissionIdentity(vocab)
+    emissionProb = calcProbNested(mergedEmission)
 
+    # Save outputs
     saveJSONFile(startProb, "startProb.json")
     saveJSONFile(transProb, "transitionProb.json")
     saveJSONFile(emissionProb, "emissionProb.json")
     saveJSONFile(dict(mergedStart), "startCount.json")
     saveJSONFile({k: dict(v) for k, v in mergedTrans.items()}, "transitionCount.json")
-    saveJSONFile(dict(mergedEmission), "emissionCount.json")
+    saveJSONFile({k: dict(v) for k, v in mergedEmission.items()}, "emissionCount.json")
 
     return startProb, transProb, emissionProb
 
