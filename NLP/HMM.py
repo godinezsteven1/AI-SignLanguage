@@ -1,88 +1,158 @@
 # This HMM class is made for probability and likilhood of word sequence
-#given hidden states of user input 
-# uses states observations emission probabilities for the HMM 
+# given hidden states of user input 
+# uses states observations, and transitions for the Bigram HMM 
 # uses Viterbi algorithm, a brute force algo, to find the most likely sequence of words 
 
 import json
+import math
+from collections import defaultdict
 
-
-with open("startProb.json", "r") as f:
-    startProb = json.load(f)
-
-with open("transitionProb.json", "r") as f:
-    transitionProb = json.load(f)
-
-with open("emissionProb.json", "r") as f:
-    emissionProb = json.load(f)
-
-
-
-
+startFileName="startProb.json"
+transFileName="transitionProb.json"
 
 class HMM:
-    def __init__(self, states, startProb, transitionProb, emissionProb):
-        self.states = states
-        self.startProb = startProb
-        self.transitionProb = transitionProb
-        self.emissionProb = emissionProb
+    def __init__(self):
+        self.startProb = defaultdict(float)
+        #dictionary of dictionary
+        self.transitionProb = defaultdict(lambda: defaultdict(float))
 
+    
+    def train(self, sequence):
+        startCount = defaultdict(int) #track start and transition probabilities 
+        transitionCount = defaultdict(lambda: defaultdict(int))
+
+        for freq in sequence:
+            if not freq:
+                continue
+            startCount[freq[0]] += 1 #initialize first word as start word
+            for i in range(1, len(freq)):
+                prev = freq[i - 1]
+                curr = seq[i]
+                transitionCount[prev][curr] += 1 #count transitions between consecutive words
+
+        totalStart = sum(startCount.values()) # add al probs 
+        for word, count in startCount.items(): # for all counts and words
+            self.startProb[word] = count / totalStart # get prob for start words
+
+
+        for prev in transitionCount:
+            totalTrans = sum(transitionCount[prev].values()) # now with transitions
+            for w in transitionCount[prev]:
+                # get transitions probabilities 
+                self.transitionProb[prev][w] = transitionCount[prev][w] / totalTrans
+
+
+
+
+    #opens file and READS
+    def loadModel(self, startFile=startFileName, transFile=transFileName):
+        with open(startFile, 'r') as file: #read
+            self.startProb = defaultdict(float, json.load(file))
+            print("reading file ", startFileName)
+        with open(transFile, 'r') as file:
+            rawTransData = json.load(file)
+            self.transitionProb = defaultdict(lambda: defaultdict(float))
+            print("reading file ", transFileName)
+            for prev, curr in rawTransData.items():
+                self.transitionProb[prev] = defaultdict(float, curr)
+
+                
 
 
     def viterbi(self, obs):
-        T = len(obs) #all of our obvservations 
+        if not obs:
+            return float('-inf'), []
+        
         V = [{}]  # V[t] holds the maximum probability for each state at time t.
         path = {} # highest probabilty seq
 
-        for i in self.states:
-            # get emission, if no exist get small number because prob not exist 
-            emitProb = self.emissionProb[i].get(obs[0], 1e-10)
-            # multiply the starting probability of state by emission if no exist small num 
-            V[0][i] = self.startProb.get(i, 1e-10) * emitProb # pi(S_i) * b_i(O_1) (viterbi equation)
-            # = small * small = unlikely sequence
-            # = big * big = likely sequence 
-            # local best 
-            path[i] = [i]
+        firstObs = obs[0]
 
-        for t in range(1, T): #for all of our iterations
-            V.append({}) #new dict 
+
+        for word in self.transitionProb:
+            # log for prob since can be small
+            # get word else return small prob if no exist .get(word, #)
+            V[0][word] = math.log(self.startProb.get(word, 1e-10))
+            path[word] = [word]
+
+        for t in range(1, len(obs)):
+            V.append({})
             newPath = {}
-            for i in self.states:
-                # max path that ends in i (because its word word word i) with respect to
-                # max and get best path
-                (prob, prevState) = max((V[t-1][i0] * self.transitionProb.get(i0, {}).get(i, 1e-10) * #S_i -> S_j
-                     self.emissionProb[i].get(obs[t], 1e-10), i0)  #emitting O_j at S_j
-                    for i0 in self.states) # chat helped write logic from the max to down here 
-                #store givne max
-                V[t][i] = prob
-                # add current state i 
-                newPath[i] = path[prevState] + [i]
-            #update 
+            currObs = obs[t] #obs at time t
+            
+            for prevW in V[t-1]: # from previous time step 
+                # get probability of our current path, log it because small prob
+                # previous word + log of transition prob of prev word going to curr obvservation, if no exist get
+                # a very small probability 
+                prob = V[t - 1][prevW] + math.log(self.transitionProb[prevW].get(currObs, 1e-10))
+                
             path = newPath
 
-        # geter for highest probability
-        (finalProb, finalState) = max((V[T-1][i], i) for i in self.states)
-        print(finalProb,path[finalState])
-        return (finalProb, path[finalState])
+
+        # find the path with the highest final log probability in the end 
+        n = len(obs) - 1
+        if V[n]:
+            bestPath = max(V[n], key=V[n].get)
+                #V[n] returns high prob path, path[bestPath] returns said path
+                #kind of genius if you think about this if statement 
+            return V[n][bestPath], path[bestPath]
+        else:
+            return float('-inf'), [] # so my code does not explode 
+
+
+
 
 
 
 if __name__ == "__main__":
-    states = list(emissionProb.keys())
-    #print(states)
-    HMModel = HMM(states, startProb, transitionProb, emissionProb)
-    #constructing sentence with high probabilities given start, trans and emission 
-    obs = ["people", "on", "reddit"]
+    hmm = HMM()
+    hmm.loadModel()
 
-    (prob, bestPath) = HMModel.viterbi(obs)
-    print("obs sequence", obs)
-    print("best path", bestPath)
-    print("best path prob", prob) 
+    obs = ["what", "is", "my", "name"]
+    prob, bestPath = hmm.viterbi(obs)
 
-#returns
-#2.6160889470241992e-23 ['people', 'reddit', 'is']
-#obs sequence ['people', 'on', 'reddit']
-#best path ['people', 'reddit', 'is']
-#best path prob 2.6160889470241992e-23
+    print("Observation sequence:", obs)
+    print("Best path:", bestPath)
+    print("Best path probability:", prob)
 
-#1. needs to be higher probability --> dataset is not big enough probabilities are small 
-#2. needs to return people on reddit, sequence was not a incorrect one --> dataset is not big enough 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
