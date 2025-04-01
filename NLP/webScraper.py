@@ -22,8 +22,8 @@ postLimit = int(postLimit)
 commonStateLimit = 500
 #postLimit = 2 #for debug 
 #commonStateLimit = 10 # for debug
-redditName = "AskReddit"
-#redditName = "neu"
+#redditName = "AskReddit"
+redditName = "neu"
 print("CLIENT_ID =", client_id)
 print("CLIENT_SECRET =", client_secret)
 print("USER_AGENT =", user_agent)
@@ -221,31 +221,31 @@ def main():
     mostCommonStates = set([w for w, _ in freqCounter.most_common(commonStateLimit)])
     wordToState = {w: ("common" if w in mostCommonStates else "rare") for w in freqCounter}
 
-    newEmission = countEmission(text, wordToState)
+    #newEmission = countEmission(text, wordToState)
 
     # if existt load file 
     oldStart = loadJSONFile("startCount.json") or {}
     oldTrans = loadJSONFile("transitionCount.json") or {}
-    oldEmission = loadJSONFile("emissionCount.json") or {}
+    #oldEmission = loadJSONFile("emissionCount.json") or {}
 
     # then merge 
     mergedStart = mergeCount(Counter(oldStart), newStart)
     mergedTrans = mergeCounters(defaultdict(Counter, oldTrans), newTrans)
-    mergedEmission = mergeCounters(defaultdict(Counter, oldEmission), newEmission)
+    #mergedEmission = mergeCounters(defaultdict(Counter, oldEmission), newEmission)
 
     # get prob 
     startProb = calcProbabilities(mergedStart)
     transProb = calcProbNested(mergedTrans)
-    emissionProb = calcProbNested(mergedEmission)
+    #emissionProb = calcProbNested(mergedEmission)
 
     # save to file 
     saveJSONFile(startProb, "startProb.json")
     saveJSONFile(transProb, "transitionProb.json")
-    saveJSONFile(emissionProb, "emissionProb.json")
+    #saveJSONFile(emissionProb, "emissionProb.json")
     saveJSONFile(dict(mergedStart), "startCount.json")
     # chat helped wit this one liner 
     saveJSONFile({k: dict(v) for k, v in mergedTrans.items()}, "transitionCount.json")
-    saveJSONFile({k: dict(v) for k, v in mergedEmission.items()}, "emissionCount.json")
+    #saveJSONFile({k: dict(v) for k, v in mergedEmission.items()}, "emissionCount.json")
 
     return startProb, transProb, emissionProb
 
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     #print(sProb)
     print("trans prob")
     #print(tProb)
-    print("emission prob")
+    #print("emission prob")
     #print(eProb)
     
 
