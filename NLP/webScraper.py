@@ -22,8 +22,10 @@ postLimit = int(postLimit)
 commonStateLimit = 500
 #postLimit = 2 #for debug 
 #commonStateLimit = 10 # for debug
+
 #redditName = "AskReddit"
-redditName = "neu"
+#redditName = "neu"
+redditName = "todayilearned"
 print("CLIENT_ID =", client_id)
 print("CLIENT_SECRET =", client_secret)
 print("USER_AGENT =", user_agent)
@@ -247,7 +249,7 @@ def main():
     saveJSONFile({k: dict(v) for k, v in mergedTrans.items()}, "transitionCount.json")
     #saveJSONFile({k: dict(v) for k, v in mergedEmission.items()}, "emissionCount.json")
 
-    return startProb, transProb, emissionProb
+    return startProb, transProb#, emissionProb
 
 
 
