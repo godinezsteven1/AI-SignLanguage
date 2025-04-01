@@ -86,6 +86,10 @@ class HMM:
                 # a very small probability 
                 prob = V[t - 1][prevW] + math.log(self.transitionProb[prevW].get(currObs, 1e-10))
                 
+                if currObs not in V[t] or prob > V[t][currObs]:
+                    V[t][currObs] = prob
+                    newPath[currObs] = path[prevW] + [currObs]
+                
             path = newPath
 
 
@@ -114,40 +118,6 @@ if __name__ == "__main__":
     print("Observation sequence:", obs)
     print("Best path:", bestPath)
     print("Best path probability:", prob)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
