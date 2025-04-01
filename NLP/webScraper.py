@@ -25,7 +25,8 @@ commonStateLimit = 500
 
 #redditName = "AskReddit"
 #redditName = "neu"
-redditName = "todayilearned"
+#redditName = "todayilearned"
+redditName = "AmItheAsshole"
 print("CLIENT_ID =", client_id)
 print("CLIENT_SECRET =", client_secret)
 print("USER_AGENT =", user_agent)
@@ -257,7 +258,7 @@ def main():
 
 #scripting use 
 if __name__ == "__main__":
-    sProb, tProb, eProb = main()
+    sProb, tProb = main()
     print("start prob")
     #print(sProb)
     print("trans prob")
