@@ -4,6 +4,7 @@ import tensorflow as tf
 import mediapipe as mp
 import pygame
 import os
+import time
 
 # Initialize MediaPipe Hands
 mp_hands = mp.solutions.hands
@@ -69,17 +70,13 @@ def preprocess_image(image):
         
         # Crop to hand
         cropped_image = image[y_min:y_max, x_min:x_max]
+
     else:
-        # If no hand detected, use center crop
-        if image.shape[0] != image.shape[1]:
-            min_dim = min(image.shape[0], image.shape[1])
-            center_x, center_y = image.shape[1] // 2, image.shape[0] // 2
-            cropped_image = image[
-                center_y - min_dim // 2:center_y + min_dim // 2,
-                center_x - min_dim // 2:center_x + min_dim // 2
-            ]
-        else:
-            cropped_image = image
+        # If no hand detected, return None for hand_crop
+        # We still need to return a dummy preprocessed image to maintain the return structure
+        dummy_image = np.zeros((IMG_SIZE, IMG_SIZE, 3))
+        preprocessed = np.expand_dims(dummy_image, axis=0)
+        return preprocessed, None
     
     # Resize to model input size
     resized_image = cv2.resize(cropped_image, (IMG_SIZE, IMG_SIZE))
@@ -99,7 +96,8 @@ def initialize_display(width=800, height=600):
     display = pygame.display.set_mode((width, height))
     return display
 
-def display_result(display, frame, result_text, confidence, hand_crop=None):
+# def display_result(display, frame, result_text, confidence, hand_crop=None):
+def display_result(display, frame, accumulated_string, confidence, hand_crop=None, current_letter = ""):
     """Display frame and recognition results"""
     display.fill((255, 255, 255))
     
@@ -116,23 +114,37 @@ def display_result(display, frame, result_text, confidence, hand_crop=None):
         hand_surface = pygame.surfarray.make_surface(hand_rgb.swapaxes(0, 1))
         display.blit(hand_surface, (360, 20))
     
-    # Display recognition result
+
+    
+    # Display the accumulated string
     font = pygame.font.Font('freesansbold.ttf', 36)
-    text_surface = font.render(result_text, True, (0, 0, 0))
+    text_surface = font.render(accumulated_string, True, (0, 0, 0))
     text_rect = text_surface.get_rect()
     text_rect.center = (400, 300)
     display.blit(text_surface, text_rect)
-    
+
+    # Display the current letter
+    current_letter_font = pygame.font.Font('freesansbold.ttf', 24)
+    # current_letter_surface = current_letter_font.render(f"Current: {result_text}", True, (0, 0, 255))
+    current_letter_surface = current_letter_font.render(f"Current: {current_letter}", True, (0, 0, 255))
+    display.blit(current_letter_surface, (300, 350))
+
     # Display confidence
     conf_font = pygame.font.Font('freesansbold.ttf', 24)
     conf_text = f"Confidence: {confidence:.2f}"
     conf_surface = conf_font.render(conf_text, True, (0, 0, 0))
-    display.blit(conf_surface, (300, 350))
+    display.blit(conf_surface, (300, 400))
     
     # Instructions
-    instructions = "Press Q to quit"
-    inst_surface = conf_font.render(instructions, True, (100, 100, 100))
-    display.blit(inst_surface, (320, 550))
+    instructions_1 = "Press C to clear string"
+    instructions_2 = "Press B to backspace"
+    instructions_3 = "Press Q to quit"
+    inst1_surface = conf_font.render(instructions_1, True, (100, 100, 100))
+    inst2_surface = conf_font.render(instructions_2, True, (100, 100, 100))
+    inst3_surface = conf_font.render(instructions_3, True, (100, 100, 100))
+    display.blit(inst1_surface, (320, 460))
+    display.blit(inst2_surface, (320, 500))
+    display.blit(inst3_surface, (320, 540))
     
     pygame.display.update()
 
@@ -160,7 +172,7 @@ def main():
 
     
     # Initialize camera
-    camera = initialize_camera(1)
+    camera = initialize_camera() #Change the device_id according to your system
     if camera is None:
         print("Failed to initialize camera. Exiting...")
         return
@@ -178,7 +190,17 @@ def main():
     # Main processing loop
     running = True
     prev_result = ""
-    confidence_threshold = 0.7
+    confidence_threshold = 0.6
+
+    accumulated_string = ""
+    last_letter = ""
+    letter_count = 0
+    no_hand_count = 0
+
+    last_prediction_time = 0
+    prediction_delay = 2.0  # Delay in seconds
+    is_waiting = False
+    waiting_message = ""
     
     while running:
         # Check for quit event
@@ -188,6 +210,10 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_q:
                     running = False
+                elif event.key == pygame.K_b:
+                    accumulated_string = accumulated_string[:-1] if accumulated_string else ""
+                elif event.key == pygame.K_c:
+                    accumulated_string = ""
         
         # Capture frame
         ret, frame = camera.read()
@@ -201,6 +227,20 @@ def main():
         # Preprocess frame for model input
         processed_frame, hand_crop = preprocess_image(frame)
         
+        current_time = time.time()
+        
+        if is_waiting and (current_time - last_prediction_time < prediction_delay):
+            # Still in waiting period, display countdown
+            remaining_time = round(prediction_delay - (current_time - last_prediction_time), 1)
+            waiting_message = f"Wait: {remaining_time}s"
+            display_result(display, frame, accumulated_string, 0.0, hand_crop, waiting_message)
+            pygame.time.delay(10)
+            continue
+        elif is_waiting:
+            # Waiting period is over
+            is_waiting = False
+            last_letter = ""
+        
         # Run prediction only if hand is detected (if hand_crop is not None)
         if hand_crop is not None and hand_crop.size > 0:
             # Get model prediction
@@ -210,14 +250,36 @@ def main():
             
             if confidence > confidence_threshold:
                 result_text = sign_classes.get(predicted_class, f"Unknown Sign ({predicted_class})")
+                # Handle special cases
+                if result_text == "Space (ASL)":
+                    accumulated_string += " "
+                    is_waiting = True
+                    last_prediction_time = current_time
+                    last_letter = ""
+                elif result_text == "Delete (ASL)":
+                    accumulated_string = accumulated_string[:-1] if accumulated_string else ""
+                    is_waiting = True
+                    last_prediction_time = current_time
+                    last_letter = ""
+                elif not is_waiting and result_text != last_letter:
+                    accumulated_string += result_text[0]
+                    last_letter = result_text
+                    is_waiting = True
+                    last_prediction_time = current_time
+                    waiting_message = f"Wait: {prediction_delay}s"
+
             else:
                 result_text = "Uncertain"
         else:
             result_text = "No hand detected"
             confidence = 0.0
+            no_hand_count += 1
+            if no_hand_count > 60:
+                last_letter = ""
+                no_hand_count = 0
         
         # Display result
-        display_result(display, frame, result_text, confidence, hand_crop)
+        display_result(display, frame, accumulated_string, confidence, hand_crop, waiting_message if is_waiting else result_text)
         
         # Add a small delay for better performance
         pygame.time.delay(10)
