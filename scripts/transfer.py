@@ -3,14 +3,14 @@ import shutil
 import random
 
 # Define source and destination directories
-source_dir = '../data/asl'
-destination_dir = '../data/asl_mini'
+source_dir = '../data/dgs'
+destination_dir = '../data/dgs_mini'
 
 # Create destination directory if it doesn't exist
 os.makedirs(destination_dir, exist_ok=True)
 
 # Function to collect random sample of images from a letter directory
-def collect_random_images(letter_dir, num_images=500):
+def collect_random_images(letter_dir, num_images=100):
     if os.path.isdir(letter_dir):
         # Get all images in the letter directory
         all_images = [f for f in os.listdir(letter_dir) if f.endswith(('.jpg', '.jpeg', '.png'))]
