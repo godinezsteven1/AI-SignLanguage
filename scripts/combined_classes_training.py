@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import mediapipe as mp
+from imgaug import augmenters as iaa
 import random
 from PIL import Image
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
@@ -73,6 +74,9 @@ def get_preprocessed_images(folder_path, sample_count, padding):
         # Only save the image if the hand was detected
         if processed_img is not None:
             processed_images.append((file, processed_img))
+
+            flipped_img = cv2.flip(processed_img, 1)  # Flip horizontally
+            processed_images.append((f"flipped_{file}", flipped_img))
     
     return processed_images
 
@@ -110,17 +114,6 @@ def balance_class_distribution():
         for class_name in dirs:
             class_path = os.path.join(root, class_name)
             image_files = [f for f in os.listdir(class_path) if f != '.DS_Store']
-            
-            # If there are more than 100 images, randomly sample 100
-            if len(image_files) > 100:
-                sampled_files = random.sample(image_files, 100)
-                
-                # Delete the excess images
-                for file in image_files:
-                    if file not in sampled_files:
-                        os.remove(os.path.join(class_path, file))
-                
-                print(f"Class {class_name} was reduced to 100 samples.")
 
 # Function to crop and resize images
 def preprocess_image(image, padding=30):
@@ -249,10 +242,18 @@ class CombinedDataGenerator(tf.keras.utils.Sequence):
         batch_indices = self.indices[idx * self.batch_size:(idx + 1) * self.batch_size]
         batch_x = []
         batch_y = np.zeros((len(batch_indices), len(self.data)))
+
+        seq = iaa.Sequential([
+            iaa.Multiply((0.8, 1.2)),  # Change brightness
+            iaa.Add((-10, 10)),  # Change contrast
+        ])
         
         for i, (class_path, image_file) in enumerate(batch_indices):
             image_path = os.path.join(class_path, image_file)
             img = cv2.imread(image_path)
+
+            img = seq(image=img)
+
             batch_x.append(img)
             
             class_idx = next(idx for idx, (path, _) in enumerate(self.data) if path == class_path)
@@ -309,11 +310,11 @@ history = model.fit(
     epochs=30,
     validation_data=val_generator,
     class_weight=class_weights,
-    callbacks=[
-        tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
-        tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=2)
-    ]
+    #callbacks=[
+    #    tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True),
+    #    tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=2)
+    #]
 )
 
 # Save model
-model.save('../models/full_model4.h5')
+model.save('../models/full_model_combined_classes.h5')

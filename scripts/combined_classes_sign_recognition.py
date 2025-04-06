@@ -8,7 +8,7 @@ import os
 # Initialize MediaPipe Hands
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
-hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.4)
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.7)
 
 # Constants
 IMG_SIZE = 128  # Same as in the model training code
@@ -243,7 +243,7 @@ def main():
         return
     
     # Load model
-    model_path = "../models/full_model4.h5"  # Update path as needed
+    model_path = "../models/full_model_combined_classes.h5"  # Update path as needed
     model = load_model(model_path)
     if model is None:
         print("Failed to load model. Exiting...")
@@ -257,7 +257,7 @@ def main():
     # Main processing loop
     running = True
     prev_result = ""
-    confidence_threshold = 0.5
+    confidence_threshold = 0.7
     
     while running:
         # Check for quit event
@@ -275,7 +275,7 @@ def main():
             break
         
         # Mirror image for more intuitive interaction
-        #frame = cv2.flip(frame, 1)
+        frame = cv2.flip(frame, 1)
         
         # Preprocess frame for model input
         processed_frame, hand_crop = preprocess_image(frame)
@@ -293,7 +293,7 @@ def main():
                 result_text = "Uncertain"
         else:
             result_text = "No hand detected"
-            confidence = 0.3
+            confidence = 0.7
         
         # Display result
         display_result(display, frame, result_text, confidence, hand_crop)
