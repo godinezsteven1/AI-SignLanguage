@@ -148,8 +148,8 @@ def prepare_combined_dataset():
 
     # Print out class counts
     print("\nClass Distribution:")
-    for class_name, count in class_counts.items():
-        print(f"{class_name}: {count} images")
+    for index, (class_name, count) in enumerate(sorted(class_counts.items())):
+        print(f"{index}: {class_name}: {count} images")
 
     print("\nClass Weights:", class_weights)
     return combined_data, class_weights
@@ -244,4 +244,4 @@ history = model.fit(
 )
 
 # Save model
-model.save('../models/full_model_no_stretch.h5')
+model.save('../models/full_model_no_bias.h5')
