@@ -1,7 +1,7 @@
 # AI Sign Language Project
 
 ## Overview
-This project aims to recognize and translate sign languages using a CNN or RNN model (LSTM). It leverages TensorFlow, Mediapipe, and NLP for feature extraction, model training, and text correction.
+This project aims to recognize and translate sign languages using a CNN model (LSTM). It leverages TensorFlow, Mediapipe, and NLP for feature extraction, model training, and text correction.
 
 ## Setup Instructions
 
