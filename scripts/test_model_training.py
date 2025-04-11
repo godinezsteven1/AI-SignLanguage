@@ -1,493 +1,269 @@
-# Import necessary libraries
-import os
-import numpy as np
 import tensorflow as tf
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.applications import EfficientNetB2
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout, BatchNormalization, Input, concatenate
+from tensorflow.keras.layers import Layer, Conv2D, TimeDistributed, Dense, GlobalAveragePooling2D, Multiply, Lambda
 from tensorflow.keras.models import Model
-import cv2
-import matplotlib.pyplot as plt
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.callbacks import LearningRateScheduler
+import numpy as np
+import os
+import pandas as pd
+from sklearn.model_selection import train_test_split
+import glob
+import warnings
 
-# Set up paths - using your exact directory structure
-base_data_dir = '../data'
-language_dirs = {
-    'asl': 'asl',
-    'dgs': 'dgs',
-    'lsl': 'LSL'
-}
+# Suppress TensorFlow warnings (optional)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-# Set hyperparameters
-img_size = (240, 240)  # Increased size for better feature detection
-batch_size = 32
-initial_learning_rate = 5e-4
-epochs = 50
-validation_split = 0.2
+# Suppress PyDataset warning
+warnings.filterwarnings('ignore', category=UserWarning, message='.*PyDataset.*super.*')
 
-# Enhanced preprocessing for sign language images
-def enhance_sign_image(img):
-    """Simplified preprocessing for sign language images"""
-    if img is None or len(img.shape) < 2:
-        return None
-        
-    # Apply preprocessing only for color images
-    if len(img.shape) == 3 and img.shape[2] == 3:
-        try:
-            # Apply slight blur to reduce noise
-            blurred = cv2.GaussianBlur(img, (3, 3), 0)
-            
-            # Simple contrast adjustment without CLAHE
-            # Convert to uint8 if it's not already
-            if blurred.dtype != np.uint8:
-                # If image is float 0-1, convert to 0-255
-                if blurred.max() <= 1.0:
-                    blurred = (blurred * 255).astype(np.uint8)
-                else:
-                    blurred = blurred.astype(np.uint8)
-            
-            # Simple contrast enhancement using standard CV2 function
-            alpha = 1.2  # Contrast control (1.0 means no change)
-            beta = 10    # Brightness control (0 means no change)
-            adjusted = cv2.convertScaleAbs(blurred, alpha=alpha, beta=beta)
-            
-            return adjusted
-        except Exception as e:
-            print(f"Warning: Image enhancement failed: {e}. Using original image.")
-            return img
-    return img
+# Simplified preprocessing function to ensure float32 format
+def preprocess_image(image):
+    """
+    Ensure the image is in float32 format with values in [0, 1].
+    This function is applied after ImageDataGenerator's rescale.
+    """
+    # Image should already be in float32 and in [0, 1] due to rescale=1./255
+    # Just ensure the dtype is float32 (in case it's not)
+    image = image.astype(np.float32)
+    return image
 
-# Prepare combined dataset with language prefixes
-def prepare_combined_dataset():
-    """Prepare a combined dataset with language prefixes for class names"""
-    # We'll combine all data but prefix class names with language identifier
-    combined_data_dir = '../data/combined_sign_data'
-    os.makedirs(combined_data_dir, exist_ok=True)
-    
-    # Track class names and counts
-    class_mapping = {}
-    sample_counts = {}
-    
-    # Process each language directory
-    for lang, lang_dir in language_dirs.items():
-        lang_path = os.path.join(base_data_dir, lang_dir)
-        
-        # Process each class directory (A, B, C, etc.)
-        for class_name in os.listdir(lang_path):
-            class_dir = os.path.join(lang_path, class_name)
-            if not os.path.isdir(class_dir):
-                continue
-                
-            # Create prefixed class name (e.g., asl_A, dgs_B)
-            prefixed_class = f"{lang}_{class_name}"
-            prefixed_dir = os.path.join(combined_data_dir, prefixed_class)
-            os.makedirs(prefixed_dir, exist_ok=True)
-            
-            # Add to class mapping
-            class_mapping[prefixed_class] = (lang, class_name)
-            
-            # Copy or link files (using symbolic links to save space)
-            sample_count = 0
-            for img_file in os.listdir(class_dir):
-                if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    # Create symbolic link instead of copying
-                    src_path = os.path.join(class_dir, img_file)
-                    dst_path = os.path.join(prefixed_dir, f"{lang}_{img_file}")
-                    
-                    if not os.path.exists(dst_path):
-                        try:
-                            # Try symbolic link first (saves space)
-                            os.symlink(os.path.abspath(src_path), dst_path)
-                        except:
-                            # Fall back to copying if symbolic links not supported
-                            import shutil
-                            shutil.copy2(src_path, dst_path)
-                    
-                    sample_count += 1
-            
-            sample_counts[prefixed_class] = sample_count
-            print(f"Processed {prefixed_class}: {sample_count} samples")
-    
-    # Print dataset summary
-    print(f"Combined dataset created at {combined_data_dir}")
-    print(f"Total classes: {len(class_mapping)}")
-    
-    return combined_data_dir, class_mapping, sample_counts
+# Custom Spatial Attention Layer
+class SpatialAttentionModule(Layer):
+    def __init__(self, **kwargs):
+        super(SpatialAttentionModule, self).__init__(**kwargs)
 
-# Create optimized data generators
-def create_data_generators(data_dir):
-    """Create training and validation generators with enhanced augmentation"""
-    # Training generator with augmentation
-    train_datagen = ImageDataGenerator(
-        # We'll do preprocessing manually in a separate step
-        rescale=1./255,
-        rotation_range=15,          # Moderate rotation
-        width_shift_range=0.1,      # Slight shifts
-        height_shift_range=0.1,
-        zoom_range=0.1,             # Slight zoom
-        brightness_range=[0.9, 1.1], # Slight brightness adjustment
-        horizontal_flip=False,      # Don't flip (could change sign meaning)
-        fill_mode='nearest',
-        validation_split=validation_split
-    )
-    
-    # Validation generator with only preprocessing
-    valid_datagen = ImageDataGenerator(
-        rescale=1./255,
-        validation_split=validation_split
-    )
-    
-    # Create generators
-    train_generator = train_datagen.flow_from_directory(
-        data_dir,
-        target_size=img_size,
-        batch_size=batch_size,
-        class_mode='categorical',
-        subset='training',
-        shuffle=True
-    )
-    
-    valid_generator = valid_datagen.flow_from_directory(
-        data_dir,
-        target_size=img_size,
-        batch_size=batch_size,
-        class_mode='categorical',
-        subset='validation',
-        shuffle=False
-    )
-    
-    return train_generator, valid_generator
+    def build(self, input_shape):
+        # Initialize the Conv2D and Multiply layers based on the input shape
+        self.conv = Conv2D(1, (1, 1), padding='same', activation='sigmoid')
+        self.multiply = Multiply()
+        # Call the build method on the sub-layers
+        self.conv.build(input_shape)
+        self.multiply.build([input_shape, input_shape])  # Multiply takes two inputs of the same shape
+        self.built = True
 
-# Create an optimized single model for all sign languages
-def create_unified_sign_model(num_classes):
-    """Create a unified model optimized for multi-language sign recognition"""
-    # Use EfficientNetB2 for better performance
-    base_model = EfficientNetB2(
-        weights='imagenet', 
-        include_top=False, 
-        input_shape=(*img_size, 3)
-    )
+    def call(self, inputs):
+        # Apply the Conv2D layer to the input to generate the attention map
+        attention = self.conv(inputs)
+        # Use the Multiply layer to apply attention to the inputs
+        output = self.multiply([inputs, attention])
+        return output
+
+    def compute_output_shape(self, input_shape):
+        # The output shape is the same as the input shape because the attention mechanism
+        # doesn't change the spatial dimensions or the number of channels
+        return input_shape
+
+# Function to build the model for sign language recognition
+def build_model(base_model, num_classes):
+    """
+    Build the model with a spatial attention module.
+    base_model: Pre-trained base model (e.g., EfficientNetB0)
+    num_classes: Number of sign language classes
+    """
+    # Freeze the base model
+    base_model.trainable = False
+
+    # Define the input (raw image input, e.g., 224x224x3)
+    inputs = tf.keras.Input(shape=(224, 224, 3))
+
+    # Add a time dimension (1 time step) for TimeDistributed using Lambda
+    x = Lambda(lambda z: tf.expand_dims(z, axis=1))(inputs)  # Shape: (batch_size, 1, 224, 224, 3)
+
+    # Apply the base model to each time step
+    x = TimeDistributed(base_model, name='base_model')(x)  # Shape: (batch_size, 1, 7, 7, 1280)
+
+    # Apply the spatial attention module
+    x = TimeDistributed(SpatialAttentionModule(), name='spatial_attention')(x)  # Shape: (batch_size, 1, 7, 7, 1280)
+
+    # Remove the time dimension using Lambda
+    x = Lambda(lambda z: tf.squeeze(z, axis=1))(x)  # Shape: (batch_size, 7, 7, 1280)
+
+    # Global average pooling to reduce spatial dimensions
+    x = GlobalAveragePooling2D()(x)  # Shape: (batch_size, 1280)
+
+    # Add a dense layer for classification
+    x = Dense(128, activation='relu')(x)
+    outputs = Dense(num_classes, activation='softmax')(x)
+
+    # Build the model
+    model = Model(inputs, outputs)
+    return model
+
+# Learning rate scheduler
+def lr_scheduler(epoch):
+    initial_lr = 0.00025
+    return initial_lr  # You can modify this to decay the learning rate if needed
+
+# Train the model
+def train_model(model, base_model, train_generator, valid_generator):
+    """
+    Train the model in phases.
+    model: The full model with the spatial attention module
+    base_model: The pre-trained base model (e.g., EfficientNetB0)
+    train_generator: Training data generator
+    valid_generator: Validation data generator
+    """
+    # Phase 1: Train the top layers
+    print("===== Phase 1: Training top layers =====")
     
-    # Initially freeze the base model
-    for layer in base_model.layers:
-        layer.trainable = False
-    
-    # Create model architecture
-    inputs = Input(shape=(*img_size, 3))
-    x = base_model(inputs)
-    x = GlobalAveragePooling2D()(x)
-    x = BatchNormalization()(x)
-    
-    # Create multiple branches for feature extraction
-    # Branch 1: Deep for complex features
-    branch1 = Dense(512, activation='relu')(x)
-    branch1 = BatchNormalization()(branch1)
-    branch1 = Dropout(0.4)(branch1)
-    branch1 = Dense(256, activation='relu')(branch1)
-    branch1 = BatchNormalization()(branch1)
-    branch1 = Dropout(0.4)(branch1)
-    
-    # Branch 2: Wider for broader feature capture
-    branch2 = Dense(768, activation='relu')(x)
-    branch2 = BatchNormalization()(branch2)
-    branch2 = Dropout(0.4)(branch2)
-    
-    # Merge branches
-    merged = concatenate([branch1, branch2])
-    merged = Dense(384, activation='relu')(merged)
-    merged = BatchNormalization()(merged)
-    merged = Dropout(0.3)(merged)
-    
-    # Final classification layer
-    outputs = Dense(num_classes, activation='softmax')(merged)
-    
-    # Create model
-    model = Model(inputs=inputs, outputs=outputs)
-    
-    # Compile model
+    # Ensure base model is frozen
+    base_model.trainable = False
+
+    # Compile the model
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=initial_learning_rate),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.00025),
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
-    
-    return model, base_model
 
-# Train with a two-phase approach
-def train_model(model, base_model, train_generator, valid_generator):
-    """Train the model with a two-phase approach for better accuracy"""
-    # Phase 1: Train only the top layers
-    print("\n===== Phase 1: Training top layers =====")
-    
-    # Set up callbacks
-    callbacks_phase1 = [
-        EarlyStopping(
-            monitor='val_accuracy',
-            patience=7,
-            restore_best_weights=True
-        ),
-        ReduceLROnPlateau(
-            monitor='val_accuracy',
-            factor=0.5,
-            patience=3,
-            min_lr=1e-6
-        ),
-        ModelCheckpoint(
-            '../models/unified_sign_model_phase1.h5',
-            save_best_only=True,
-            monitor='val_accuracy'
-        )
+    # Define callbacks
+    callbacks = [
+        LearningRateScheduler(lr_scheduler)
     ]
-    
-    # Train top layers
+
+    # Train the model
     history_phase1 = model.fit(
         train_generator,
         validation_data=valid_generator,
-        epochs=15,
-        callbacks=callbacks_phase1
+        epochs=20,
+        callbacks=callbacks,
+        verbose=1
     )
-    
-    # Phase 2: Fine-tune upper layers of the base model
-    print("\n===== Phase 2: Fine-tuning top layers of base model =====")
-    
-    # Unfreeze top layers of the base model
-    for layer in base_model.layers[-30:]:
-        layer.trainable = True
-    
-    # Recompile with lower learning rate
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-5),
-        loss='categorical_crossentropy',
-        metrics=['accuracy']
+
+    return model, history_phase1
+
+# Load and preprocess the dataset
+def load_data(data_dir, target_size=(224, 224), batch_size=32, validation_split=0.2):
+    """
+    Load and preprocess the dataset from a single directory containing asl, dgs, and lsl folders.
+    data_dir: Path to the dataset directory (contains asl, dgs, lsl folders)
+    target_size: Target image size (e.g., (224, 224))
+    batch_size: Batch size for training
+    validation_split: Fraction of data to use for validation (e.g., 0.2 for 20%)
+    """
+    # List of sign languages
+    sign_languages = ['asl', 'dgs', 'lsl']
+
+    # Collect all image paths and labels
+    image_paths = []
+    labels = []
+
+    # Iterate over each sign language folder
+    for sign_lang in sign_languages:
+        sign_lang_dir = os.path.join(data_dir, sign_lang)
+        if not os.path.exists(sign_lang_dir):
+            print(f"Warning: Directory {sign_lang_dir} not found. Skipping.")
+            continue
+
+        # Iterate over each alphabet folder (A, B, ..., Z)
+        for label in os.listdir(sign_lang_dir):
+            label_dir = os.path.join(sign_lang_dir, label)
+            if not os.path.isdir(label_dir):
+                continue
+
+            # Collect all image paths in this alphabet folder
+            for img_file in glob.glob(os.path.join(label_dir, '*.[jp][pn][gf]')):  # Match .jpg, .png, .jpeg
+                image_paths.append(img_file)
+                labels.append(label)
+
+    # Create a DataFrame with image paths and labels
+    df = pd.DataFrame({'filename': image_paths, 'class': labels})
+
+    # Split the data into training and validation sets
+    train_df, valid_df = train_test_split(df, test_size=validation_split, stratify=df['class'], random_state=42)
+
+    # Print the number of images in each set
+    print(f"Total images: {len(df)}")
+    print(f"Training images: {len(train_df)}")
+    print(f"Validation images: {len(valid_df)}")
+    print(f"Number of classes: {len(df['class'].unique())}")
+
+    # Data augmentation for training
+    train_datagen = ImageDataGenerator(
+        rescale=1./255,  # Normalize pixel values to [0, 1]
+        rotation_range=20,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
+        shear_range=0.2,
+        zoom_range=0.2,
+        horizontal_flip=True,
+        fill_mode='nearest',
+        preprocessing_function=preprocess_image
     )
-    
-    # Set up callbacks for phase 2
-    callbacks_phase2 = [
-        EarlyStopping(
-            monitor='val_accuracy',
-            patience=10,
-            restore_best_weights=True
-        ),
-        ReduceLROnPlateau(
-            monitor='val_accuracy',
-            factor=0.2,
-            patience=5,
-            min_lr=1e-7
-        ),
-        ModelCheckpoint(
-            '../models/unified_sign_model_phase2.h5',
-            save_best_only=True,
-            monitor='val_accuracy'
-        )
-    ]
-    
-    # Train with fine-tuning
-    history_phase2 = model.fit(
-        train_generator,
-        validation_data=valid_generator,
-        epochs=35,
-        callbacks=callbacks_phase2,
-        initial_epoch=len(history_phase1.history['loss'])
+
+    # Only rescaling for validation
+    valid_datagen = ImageDataGenerator(
+        rescale=1./255,
+        preprocessing_function=preprocess_image
     )
-    
-    # Combine histories
-    combined_history = {
-        'accuracy': history_phase1.history['accuracy'] + history_phase2.history['accuracy'],
-        'val_accuracy': history_phase1.history['val_accuracy'] + history_phase2.history['val_accuracy'],
-        'loss': history_phase1.history['loss'] + history_phase2.history['loss'],
-        'val_loss': history_phase1.history['val_loss'] + history_phase2.history['val_loss']
-    }
-    
-    return model, combined_history
 
-# Evaluate and save the model
-def evaluate_and_save_model(model, valid_generator, class_mapping):
-    """Evaluate model performance and save it"""
-    # Final evaluation
-    evaluation = model.evaluate(valid_generator)
-    print(f"\nFinal model - Loss: {evaluation[0]:.4f}, Accuracy: {evaluation[1]:.4f}")
-    
-    # Save the final model
-    model.save('../models/unified_sign_model.h5')
-    print("Final model saved to ../models/unified_sign_model.h5")
-    
-    # Save the class mapping
-    import json
-    with open('../models/class_mapping.json', 'w') as f:
-        json.dump(class_mapping, f, indent=2)
-    
-    # Create prediction function for easy use
-    with open('../models/sign_predictor.py', 'w') as f:
-        f.write('''
-import os
-import cv2
-import numpy as np
-import tensorflow as tf
-import json
-
-# Load class mapping
-with open('class_mapping.json', 'r') as f:
-    CLASS_MAPPING = json.load(f)
-
-def enhance_sign_image(img):
-    """Enhanced preprocessing for sign language images"""
-    if img is None or len(img.shape) < 2:
-        return None
-        
-    # Apply preprocessing only for color images
-    if len(img.shape) == 3 and img.shape[2] == 3:
-        # Convert to HSV for better hand segmentation
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        
-        # Apply slight blur to reduce noise
-        blurred = cv2.GaussianBlur(img, (3, 3), 0)
-        
-        # Enhance contrast using CLAHE
-        lab = cv2.cvtColor(blurred, cv2.COLOR_BGR2LAB)
-        l, a, b = cv2.split(lab)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        cl = clahe.apply(l)
-        enhanced_lab = cv2.merge((cl, a, b))
-        enhanced = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
-        
-        return enhanced
-    return img
-
-def preprocess_image(image_path, target_size=(240, 240)):
-    """Preprocess an image for prediction"""
-    # Load image
-    if isinstance(image_path, str):
-        img = cv2.imread(image_path)
-    else:
-        img = image_path
-    
-    if img is None:
-        raise ValueError("Could not load image")
-    
-    # Resize
-    img = cv2.resize(img, target_size)
-    
-    # Apply enhancement
-    img = enhance_sign_image(img)
-    
-    # Normalize
-    img = img.astype(np.float32) / 255.0
-    
-    # Add batch dimension
-    img = np.expand_dims(img, axis=0)
-    
-    return img
-
-def predict_sign(model, image_path):
-    """Predict sign from image"""
-    # Preprocess image
-    img = preprocess_image(image_path)
-    
-    # Make prediction
-    prediction = model.predict(img)[0]
-    class_idx = np.argmax(prediction)
-    
-    # Get class name from generator
-    from tensorflow.keras.preprocessing.image import ImageDataGenerator
-    datagen = ImageDataGenerator(rescale=1./255)
-    generator = datagen.flow_from_directory(
-        '../data/combined_sign_data',
-        target_size=(240, 240),
-        batch_size=1,
-        class_mode='categorical'
+    # Create training data generator
+    train_generator = train_datagen.flow_from_dataframe(
+        dataframe=train_df,
+        x_col='filename',
+        y_col='class',
+        target_size=target_size,
+        batch_size=batch_size,
+        class_mode='categorical',
+        shuffle=True
     )
-    
-    # Get class name
-    class_indices = generator.class_indices
-    class_names = {v: k for k, v in class_indices.items()}
-    predicted_class = class_names[class_idx]
-    
-    # Parse language and sign
-    language, sign = predicted_class.split('_', 1)
-    
-    # Get confidence
-    confidence = float(prediction[class_idx])
-    
-    return {
-        "language": language,
-        "sign": sign,
-        "confidence": confidence,
-        "all_predictions": {class_names[i]: float(prediction[i]) for i in np.argsort(-prediction)[:5]}
-    }
 
-# Example usage:
-# model = tf.keras.models.load_model('unified_sign_model.h5')
-# result = predict_sign(model, 'path_to_image.jpg')
-# print(result)
-        ''')
-    
-    return evaluation
+    # Create validation data generator
+    valid_generator = valid_datagen.flow_from_dataframe(
+        dataframe=valid_df,
+        x_col='filename',
+        y_col='class',
+        target_size=target_size,
+        batch_size=batch_size,
+        class_mode='categorical',
+        shuffle=False
+    )
 
-# Plot and save training history
-def plot_training_history(history):
-    """Plot and save training history"""
-    plt.figure(figsize=(12, 4))
-    
-    # Plot accuracy
-    plt.subplot(1, 2, 1)
-    plt.plot(history['accuracy'], label='Train')
-    plt.plot(history['val_accuracy'], label='Validation')
-    plt.title('Model Accuracy')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
-    plt.legend()
-    
-    # Plot loss
-    plt.subplot(1, 2, 2)
-    plt.plot(history['loss'], label='Train')
-    plt.plot(history['val_loss'], label='Validation')
-    plt.title('Model Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.legend()
-    
-    plt.tight_layout()
-    plt.savefig('../models/training_history.png')
-    print("Training history plot saved to ../models/training_history.png")
+    return train_generator, valid_generator
 
 # Main function
 def main():
-    """Main function to train the unified sign language model"""
-    print("=== Starting Unified Sign Language Model Training ===")
-    
-    # Prepare combined dataset
-    data_dir, class_mapping, sample_counts = prepare_combined_dataset()
-    
-    # Create data generators
-    train_generator, valid_generator = create_data_generators(data_dir)
-    
-    # Print class information
+    # Path to your dataset (adjust this path to match your directory structure)
+    data_dir = "C:/Users/nived/OneDrive/Desktop/Spring 2025/Foundations of AI/Project/AI-SignLanguage/data"
+
+    # Ensure directory exists
+    if not os.path.exists(data_dir):
+        raise FileNotFoundError(f"Dataset directory not found: {data_dir}. Please check the path.")
+
+    # Load the data
+    target_size = (224, 224)  # Input size for EfficientNetB0
+    batch_size = 32
+    validation_split = 0.2  # 20% of the data for validation
+    train_generator, valid_generator = load_data(data_dir, target_size, batch_size, validation_split)
+
+    # Number of classes (based on the unique labels in the dataset)
     num_classes = len(train_generator.class_indices)
     print(f"Number of classes: {num_classes}")
-    print(f"Class mapping: {train_generator.class_indices}")
-    
-    # Create model
-    model, base_model = create_unified_sign_model(num_classes)
-    print(model.summary())
-    
-    # Train model
+
+    # Load the base model (EfficientNetB0)
+    base_model = tf.keras.applications.EfficientNetB0(
+        include_top=False,
+        weights='imagenet',
+        input_shape=(224, 224, 3)
+    )
+
+    # Build the model
+    model = build_model(base_model, num_classes)
+
+    # Print model summary
+    model.summary()
+
+    # Train the model
     model, history = train_model(model, base_model, train_generator, valid_generator)
-    
-    # Evaluate and save model
-    evaluation = evaluate_and_save_model(model, valid_generator, class_mapping)
-    
-    # Plot training history
-    plot_training_history(history)
-    
-    print("=== Training Complete ===")
-    print(f"Final Accuracy: {evaluation[1]:.4f}")
+
+    # Save the model
+    model.save('C:/Users/nived/OneDrive/Desktop/Spring 2025/Foundations of AI/Project/AI-SignLanguage/models/sign_language_model.h5')
+
+    return model, history
 
 if __name__ == "__main__":
-    # Configure GPU memory growth to avoid OOM errors
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    if gpus:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    
-    # Run main function
-    main()
+    try:
+        model, history = main()
+        print("Training completed successfully!")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
