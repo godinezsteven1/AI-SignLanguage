@@ -11,8 +11,10 @@ import os
 startFileName="startProb.json"
 transFileName="transitionProb.json"
 
+#abstraction for sliglty easier stuff 
+supportedLanguages = ["en", "es", "de"]
 def getLangPath(fileName, language=None):
-    if language is None or language not in ["en", "es", "de"]: # english, spanish, german 
+    if language is None or language not in supportedLanguages: # english, spanish, german 
         language = "en"  #fall back to english 
     directory = os.path.join("Languages",language)
     os.makedirs(directory, exist_ok=True) #creates dir if no exist, kind of nice debugger

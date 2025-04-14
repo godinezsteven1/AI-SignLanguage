@@ -3,48 +3,69 @@
 import math
 import json
 from collections import defaultdict
+import os 
 
 startProbFileName = "startProb.json"
 transitionProbName = "transitionProb.json"
 
+
+supportedLanguages = ["en", "es", "de"]
+def getLangPath(fileName, language=None):
+    if language is None or language not in supportedLanguages:
+    #base case fall back  -- english 
+        language = "en" 
+    directory = os.path.join("Languages", language)
+    #another fall back make dir if no exist, # debug too 
+    os.makedirs(directory,exist_ok=True)
+    return os.path.join(directory, fileName)
+
+
+
+
 # get json 
-def loadStartProbabilities(fileName=startProbFileName): 
-    with open(fileName, 'r') as file:
-        startProb = json.load(file)
-        print(f"{fileName} read")
-        return startProb
+def loadStartProbabilities(language=None): 
+    fileName = getLangPath(startProbFileName)
+    try:
+        with open(fileName, 'r') as file:
+            startProb = json.load(file)
+            # debug 
+            #print(f"{fileName} is being read")
+            return startProb
+    except Exception as e:
+            #print(f"Error with {fileName} probably does not exist")
+        return {} # to prevent ocmputer for exploding
+    
 
     
 # get json and  create nested dict 
-def loadTransitionProbabilities(fileName=transitionProbName): 
-    with open(fileName, 'r') as file:
-        transitions = json.load(file)
-    print(f"{fileName} read")
-
-    nestedDict = {}
-    for word, nextWords in transitions.items():
-        nestedDict[word] = defaultdict(lambda: 1e-10, nextWords) # chat helped w the nameless func 
-    # so my computer and urs wont explode - aka if words dont exist because my dataset is from reddit + lightweight
-    answer = defaultdict(lambda: defaultdict(lambda: 1e-10)) # give it small probability 
-    answer.update(nestedDict)
-
-    return answer
-
-
-
-
-
-
+def loadTransitionProbabilities(language=None): 
+    smallProbs = lambda: defaultdict(lambda: 1e-10)
+    # built in failsafe --> En
+    fileName = getLangPath(transitionProbName, language)
+    try:
+        with open(fileName, 'r') as file:
+            transitions = json.load(file)
+        print(f"{fileName} is being read")
+        nestedDict = {} 
+        for word, nextWords in transitions.items():
+            nestedDict[word] = defaultdict(lambda: 1e-10, nextWords) # chat helped
+        answer = defaultdict(smallProbs) # give it small probability 
+        answer.update(nestedDict)
+        return answer
+    except Exception as e:
+        print(f"Error loading {fileName}: {e}")
+        return defaultdict(smallProbs)
+        
 
 
 
 #uses Viterbi Algorithm to find most likely sequence 
-def textSegmentation(text, wordProb=None, transProb=None):
+def textSegmentation(text, language=None, wordProb=None, transProb=None):
     # load if not given aka prevent dumb mistake... again lol 
     if wordProb is None:
-        wordProb = loadStartProbabilities()
+        wordProb = loadStartProbabilities(language)
     if transProb is None:
-        transProb = loadTransitionProbabilities()
+        transProb = loadTransitionProbabilities(language)
 
     text = text.lower() # jsut in case 
     textLength = len(text)
@@ -91,12 +112,6 @@ def textSegmentation(text, wordProb=None, transProb=None):
             if newScore > table[j][0]:
                 table[j] = (newScore, currentSegmentation + [word])
 
-
-
-
-
-
-        
     # if no exist just return given text -- else (87) we return best segmentaiton 
     if table[textLength][0] == non_valid_score:
         result = []
@@ -134,8 +149,15 @@ if __name__ == "__main__":
         "goaway",
         "buthow"
     ]
-    
+
+    print("Default English Test")
     for testText in testTexts:
         segmented = textSegmentation(testText)
         print(f"Original: {testText}")
         print(f"Segmented: {' '.join(segmented)}")
+
+    print("Targeted English Test")
+    for testText in testTexts:
+            segmented = textSegmentation(testText, language="en")
+            print(f"Original: {testText}")
+            print(f"Segmented: {' '.join(segmented)}")
