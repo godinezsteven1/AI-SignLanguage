@@ -7,15 +7,16 @@ from collections import defaultdict
 startProbFileName = "startProb.json"
 transitionProbName = "transitionProb.json"
 
-# Reading our start probabilities 
+# get json 
 def loadStartProbabilities(fileName=startProbFileName): 
     with open(fileName, 'r') as file:
-        return json.load(file)
-    print(f"{fileName} read")
+        startProb = json.load(file)
+        print(f"{fileName} read")
+        return startProb
 
     
-# Reading our transition probabilities and create nested dict for easy access
-def loadTransitionProbabilitiesCreateNestedDict(fileName=transitionProbName): 
+# get json and  create nested dict 
+def loadTransitionProbabilities(fileName=transitionProbName): 
     with open(fileName, 'r') as file:
         transitions = json.load(file)
     print(f"{fileName} read")
@@ -34,41 +35,107 @@ def loadTransitionProbabilitiesCreateNestedDict(fileName=transitionProbName):
 
 
 
+
+
+
 #uses Viterbi Algorithm to find most likely sequence 
-#runs it with (maybe corpus) dataset csv postgreSQl table with word: frequency 
-def textSegmentation(text, wordProb=None):
+def textSegmentation(text, wordProb=None, transProb=None):
+    # load if not given aka prevent dumb mistake... again lol 
+    if wordProb is None:
+        wordProb = loadStartProbabilities()
+    if transProb is None:
+        transProb = loadTransitionProbabilities()
+
+    text = text.lower() # jsut in case 
     textLength = len(text)
-    #tuple from -inf to text length for (word, probability) or technically (%, word)
-    # if -inf = no valid seg found for now 
-    table = (-math.inf, []) for _ in range(textLength + 1)
-    #base case no string,g 
-    table[0] = (0.0,[])
 
+    #max segment size at a time 
+    maxSegmentSize = 15 #characters 
+    non_valid_score = float('-inf')
+    # viterbi table format  (bestlogprob, bestsegmentation)
+    table = [(non_valid_score, []) for _ in range(textLength + 1)] #  chat helped this line 
+    table[0] = (0.0, [])  # our base is no string has 0 (log) prob 
+
+    #forward
+    # voter type of implementtion 
     for i in range(textLength):
-        #current score and best score at i 
-        currentScore = table[i]
-        currentSegment = table[i]
-
-        #has not been set up / does not exist. 
-        if currentScore == -math.inf:
+        currentScore, currentSegmentation = table[i]
+        # skip if nothing was found/ no exist 
+        if currentScore == non_valid_score:
             continue
+        # trying all words from 1 -brute force 
+        for j in range(i + 1, min(i + maxSegmentSize + 1, textLength + 1)):
+            word = text[i:j]
+
+            wordExist = word in wordProb
+            # need to incentivize word being split and not staying together 
+            wordBonus = 0
+            if wordExist:
+                wordBonus = math.log(100)
+
 
             
-        #need to go to the word endings 
-        for j in range(i + 1, n + 1):
+            # getting the score for given word 
+            wordProbScore = math.log(wordProb.get(word, 1e-10)) + wordBonus
+            # if previous words add probability to it 
+            transProbScore = 0
+            if currentSegmentation:
+                prevWord = currentSegmentation[-1]
+                if prevWord in transProb and word in transProb[prevWord]:
+                    transProbScore = math.log(transProb[prevWord][word])
+                else:
+                    transProbScore = math.log(1e-10)  # unknown transitions
+                    
+            newScore = currentScore + wordProbScore + transProbScore # if 0s nothing will change (for lin3 64, 72)
+        # if better exist 
+            if newScore > table[j][0]:
+                table[j] = (newScore, currentSegmentation + [word])
+
+
+
+
+
 
         
-        #try all combinations 
-        #does word exist chcek from csv?
-        #log word for probabilities 
-        #make it score update to new score 
-        #if new score better then curr score 
-        #   update score and append to segmentation 
-        #get best score/ segmentation 
-        #return it 
-    return True #optimalSegmentation
-            
-        
-        
+    # if no exist just return given text -- else (87) we return best segmentaiton 
+    if table[textLength][0] == non_valid_score:
+        result = []
+        i = 0 
+        while i < textLength:
+            bestWord = None
+            bestScore = float('-inf')
+
+            for j in range(i + 1, min(i + maxSegmentSize + 1, textLength + 1)):
+                word = text[i:j]
+                if word in wordProb and wordProb[word] > 0: #might be redundant
+                    score = math.log(wordProb[word])
+                    if score > bestScore:
+                        bestScore = score
+                        bestWord = word
+            if bestWord:
+                result.append(bestWord)
+                i += len(bestWord)
+            else: # none found  - slang issues
+                # take one character and moving on 
+                result.append(text[i])
+                i += 1 
+        return result
+
+                               
+    return table[textLength][1]
+
+
+# test simple 
+if __name__ == "__main__":
+    testTexts = [
+        "igofast",
+        "iloveit",
+        "whatif",
+        "goaway",
+        "buthow"
+    ]
     
-    
+    for testText in testTexts:
+        segmented = textSegmentation(testText)
+        print(f"Original: {testText}")
+        print(f"Segmented: {' '.join(segmented)}")
