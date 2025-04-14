@@ -11,23 +11,18 @@ import os
 startFileName="startProb.json"
 transFileName="transitionProb.json"
 
-def getLangPath(fileName, language=None):
+def getLangPath(filename, language=None):
     if language is None or language not in ["en", "es", "de"]: # english, spanish, german 
         language = "en"  #fall back to english 
-    directory = os.path.join("Languages",language)
-    os.makedirs(directory, exist_ok=True) #creates dir if no exist, kind of nice debugger
-    return os.path.join(directory, fileName)
-
-
-
-
+    language_dir = os.path.join("Languages", language)
+    os.makedirs(language_dir, exist_ok=True) #creates dir if no exist, kind of nice debugger
+    return os.path.join(language_dir, filename)
 
 class HMM:
     def __init__(self):
         self.startProb = defaultdict(float)
         #dictionary of dictionary
         self.transitionProb = defaultdict(lambda: defaultdict(float))
-
     
     def train(self, sequence):
         startCount = defaultdict(int) #track start and transition probabilities 
@@ -39,13 +34,12 @@ class HMM:
             startCount[freq[0]] += 1 #initialize first word as start word
             for i in range(1, len(freq)):
                 prev = freq[i - 1]
-                curr = freq[i] #i dont know if this change was a mistake 
+                curr = freq[i]  # fixed from seq[i]
                 transitionCount[prev][curr] += 1 #count transitions between consecutive words
 
         totalStart = sum(startCount.values()) # add al probs 
         for word, count in startCount.items(): # for all counts and words
             self.startProb[word] = count / totalStart # get prob for start words
-
 
         for prev in transitionCount:
             totalTrans = sum(transitionCount[prev].values()) # now with transitions
@@ -53,36 +47,30 @@ class HMM:
                 # get transitions probabilities 
                 self.transitionProb[prev][w] = transitionCount[prev][w] / totalTrans
 
-
-
-
-    #opens file and READS in  given language ofc
-    def loadModel(self, language=None):
-        startFile = getLangPath(startFileName, language) 
-        transFile = getLangPath(transFileName, language)
-
-
-        # built in  error handling in get Lang path if it fails here(80) means 
-        # .json for given files DO NOT EXIST 
-
-        try: 
+    #opens file and READS - updated to use language parameter
+    def loadModel(self, language=None, startFile=None, transFile=None):
+        # If specific files are not provided, use language path
+        if startFile is None:
+            startFile = getLangPath(startFileName, language)
+        if transFile is None:
+            transFile = getLangPath(transFileName, language)
+            
+        try:
             with open(startFile, 'r') as file: #read
                 self.startProb = defaultdict(float, json.load(file))
-                #print(f"reading file: {startFile} in lang: {language}") #debug
+                print(f"Reading file {startFile}")
             with open(transFile, 'r') as file:
                 rawTransData = json.load(file)
                 self.transitionProb = defaultdict(lambda: defaultdict(float))
-                #print(f"reading file: {transFile} in lang: {language}")n# debug
+                print(f"Reading file {transFile}")
                 for prev, curr in rawTransData.items():
                     self.transitionProb[prev] = defaultdict(float, curr)
             return True
         except Exception as e:
-            print(f"Error: {e}: Line 77 of HMM.py, error loading {startFile} {transFile} in {e}")
+            print(f"Error loading model: {e}")
             return False
 
-                
-
-    # already uses files  should remain unchanged 
+    # Viterbi remains unchanged - it uses the loaded probabilities
     def viterbi(self, obs):
         if not obs:
             return float('-inf'), []
@@ -91,7 +79,6 @@ class HMM:
         path = {} # highest probabilty seq
 
         firstObs = obs[0]
-
 
         for word in self.transitionProb:
             # log for prob since can be small
@@ -116,7 +103,6 @@ class HMM:
                 
             path = newPath
 
-
         # find the path with the highest final log probability in the end 
         n = len(obs) - 1
         if V[n]:
@@ -127,37 +113,17 @@ class HMM:
         else:
             return float('-inf'), [] # so my code does not explode 
 
-
-
-
-
-
 if __name__ == "__main__":
-    # test english default 
-    hmm = HMM()
-    hmm.loadModel()
+    # Test with default language (English)
+    hmm_en = HMM()
+    hmm_en.loadModel()  # Defaults to English
 
     obs = ["what", "is", "my", "name"]
-    prob, bestPath = hmm.viterbi(obs)
-    print("English Observation sequence:", obs)
-    print("Best path:", bestPath)
-    print("Best path probability:", prob)
-    # -------------------------------------------
-    # test english explicitly 
-    hmm_en = HMM()
-    hmm_en.loadModel(language="en")  # testing w ISO
-    obs = ["what", "is", "my", "name"]
-    prob, bestPath = hmm_en.viterbi(obs) 
-    print("English test (explicit ISO code):")
+    prob, bestPath = hmm_en.viterbi(obs)
+
+    print("English test:")
     print("Observation sequence:", obs)
     print("Best path:", bestPath)
     print("Best path probability:", prob)
     
-
-
-
-
-
-
-
-        
+   
