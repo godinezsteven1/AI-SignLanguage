@@ -6,6 +6,7 @@ import pygame
 import sys
 import time
 from pygame.locals import *
+from pipeline import NLPpipeline
 
 class ASLDetectionSystem:
     def __init__(self, width=800, height=600, model_path="models\\full_model_combined_classes.h5"): 
@@ -307,17 +308,6 @@ class ASLDetectionSystem:
                 frame_surface = pygame.surfarray.make_surface(frame_rgb.swapaxes(0, 1))
                 self.screen.blit(frame_surface, (40, 120))
                 
-                # Choose circle color based on hand detection status
-                # circle_color = self.DARK_GRAY  # Default color - no hand
-                # if self.hand_detected:
-                #     if self.ready_for_detection:
-                #         circle_color = self.GREEN  # Green - hand positioned and ready
-                #     else:
-                #         circle_color = self.CYAN  # Cyan - hand detected but not ready
-                
-                # # Draw detection circle overlay with status-based color
-                # pygame.draw.circle(self.screen, circle_color, (270, 287), 100, 2)
-                
                 # Draw hand landmarks if available with status-based color
                 if self.hand_landmarks:
                     # This is simplified - in a real application you'd need to transform
@@ -509,6 +499,41 @@ class ASLDetectionSystem:
         
         return True
     
+    def extractAndcount(self, prediction, dict_counter):
+        start = None
+        depth = 0
+        key_a = "a"
+        key_d = "d"
+        key_e = "e"
+        text_in_paranthesis = None
+        for i, char in enumerate(prediction):
+            if char == '(':
+                if depth == 0:
+                    start = i +1
+                depth +=1
+            elif char == ')':
+                depth -= 1
+                if depth == 0 and start is not None:
+                    text_in_paranthesis = prediction[start:i] 
+        
+        if '/' not in text_in_paranthesis:
+            if 'a' in text_in_paranthesis:
+                dict_counter[key_a] += 1
+            if 'd' in text_in_paranthesis:
+                dict_counter[key_d] += 1
+            if 'e' in text_in_paranthesis:
+                dict_counter[key_e] += 1
+        else:
+            languages = text_in_paranthesis.split("/")
+            if 'a' in languages:
+                dict_counter[key_a] += 1
+            if 'd' in languages:
+                dict_counter[key_d] += 1
+            if 'e' in languages:
+                dict_counter[key_e] += 1
+
+        return dict_counter
+
     def process_frame(self, frame):
         """Process a camera frame and update detection"""
         # Preprocess frame for model input
@@ -531,6 +556,12 @@ class ASLDetectionSystem:
             self.is_waiting = False
             self.last_letter = ""
         
+        confidence_counter = {
+            "a" : 0,
+            "d" :0,
+            "e" :0
+        }
+
         # Run prediction only if hand is detected AND ready for detection
         if hand_crop is not None and hand_crop.size > 0 and self.ready_for_detection:
             # Get model prediction
@@ -558,11 +589,8 @@ class ASLDetectionSystem:
                     self.is_waiting = True
                     self.last_prediction_time = current_time
                     self.waiting_message = f"Wait: {self.prediction_delay}s"
-                    
-                    # Update detection history
-                    # if len(self.detection_history) > 9:
-                    #     self.detection_history.pop(0)
-                    # self.detection_history.append(self.current_detection[0])
+                    confidence_counter = extractAndcount(self.current_detection ,confidence_counter)
+
             else:
                 self.current_detection = "Uncertain"
         elif hand_crop is not None and hand_crop.size > 0:
