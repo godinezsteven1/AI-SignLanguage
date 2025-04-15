@@ -21,7 +21,7 @@ for label in class_labels:
     class_path = os.path.join(DATA_DIR, label)
     os.makedirs(class_path, exist_ok=True)
 
-    print(f"📸 Collecting data for class '{label.upper()}'")
+    print(f" Collecting data for class '{label.upper()}'")
 
     # Wait for user to press Q
     while True:
@@ -37,7 +37,7 @@ for label in class_labels:
         if cv2.waitKey(25) & 0xFF == ord('q'):
             break
 
-    print("⏳ Starting image capture in 3 seconds...")
+    print("Starting image capture in 3 seconds...")
     time.sleep(3)
 
     counter = 0
