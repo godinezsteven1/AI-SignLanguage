@@ -49,4 +49,4 @@ for label in class_names:
 with open('data.pickle', 'wb') as f:
     pickle.dump({'data': data, 'labels': labels}, f)
 
-print("✅ Dataset saved to data.pickle with {} samples.".format(len(data)))
+print("Dataset saved to data.pickle with {} samples.".format(len(data)))
