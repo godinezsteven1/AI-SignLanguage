@@ -14,7 +14,7 @@ dataset_size = 100
 cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
-    print("❌ Cannot open camera. Exiting.")
+    print("Cannot open camera. Exiting.")
     exit()
 
 for label in class_labels:
@@ -27,7 +27,7 @@ for label in class_labels:
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("❌ Failed to grab frame in preview.")
+            print("Failed to grab frame in preview.")
             continue
 
         cv2.putText(frame, f'Collecting for "{label.upper()}". Press Q to start.',
@@ -44,7 +44,7 @@ for label in class_labels:
     while counter < dataset_size:
         ret, frame = cap.read()
         if not ret:
-            print("❌ Frame capture failed.")
+            print("Frame capture failed.")
             continue
 
         cv2.imshow('frame', frame)
@@ -52,7 +52,7 @@ for label in class_labels:
 
         filename = os.path.join(class_path, f'{counter}.jpg')
         cv2.imwrite(filename, frame)
-        print(f"✅ Saved {filename}")
+        print(f"Saved {filename}")
         counter += 1
 
 cap.release()
