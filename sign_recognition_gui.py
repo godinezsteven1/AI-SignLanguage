@@ -4,8 +4,13 @@ import tensorflow as tf
 import mediapipe as mp
 import pygame
 import sys
+import os
 import time
 from pygame.locals import *
+sys.path.append(os.path.join(os.path.dirname(__file__), 'NLP'))
+from pipeline import NLPpipeline
+from collections import deque
+ 
 
 class ASLDetectionSystem:
     def __init__(self, width=800, height=600, model_path="models\\full_model_combined_classes.h5"): 
@@ -21,7 +26,7 @@ class ASLDetectionSystem:
         self.GRAY = (220, 220, 220)
         self.DARK_GRAY = (120, 120, 120)
         self.BLACK = (0, 0, 0)
-        self.CYAN = (0, 255, 255)  # Added cyan color
+        self.CYAN = (0, 255, 255)
         self.GREEN = (75, 200, 100)
         
         # Window setup
@@ -75,14 +80,26 @@ class ASLDetectionSystem:
         self.waiting_message = ""
         self.no_hand_count = 0
         self.confidence_threshold = 0.7
-        
-        # Practice mode
-        self.practice_mode = False
+
+        # NLP variables
+        self.confidence_counter = {
+            "asl" : 0.00,
+            "dgs" : 0.00,
+            "lse" : 0.00
+        }
+        self.iso = {
+            "asl" : "en",
+            "dgs" : "de",
+            "lse" : "es"
+        }
+        self.probable_language = None
+        self.isoCode = "en"
+        self.lang_history = deque(maxlen=10)
         
         # Main clock
         self.clock = pygame.time.Clock()
         
-        # Define mapping from class indices to sign meanings
+        # Mapping from class indices to sign meanings
         self.sign_classes = {
             0: "A (asl/dgs/lse)", 
             1: "B (asl/dgs)", 
@@ -217,8 +234,7 @@ class ASLDetectionSystem:
                 self.ready_for_detection = False
             
         else:
-            # If no hand detected, return None for hand_crop
-            # We still need to return a dummy preprocessed image to maintain the return structure
+            # If no hand detected, return a dummy preprocessed image to maintain the return structure
             dummy_image = np.zeros((self.IMG_SIZE, self.IMG_SIZE, 3))
             preprocessed = np.expand_dims(dummy_image, axis=0)
             self.hand_landmarks = None
@@ -289,7 +305,7 @@ class ASLDetectionSystem:
         self.screen.blit(title, (40, 36))
 
         # Instructions
-        instructions = self.small_font.render('Press C to clear, B to backspace, Q to quit', True, self.DARK_GRAY)
+        instructions = self.small_font.render('Press Enter to see NLP result, Press C to clear, B to backspace, Q to quit', True, self.DARK_GRAY)
         self.screen.blit(instructions, (40, 570))
     
     def draw_camera_feed(self, frame):
@@ -307,21 +323,8 @@ class ASLDetectionSystem:
                 frame_surface = pygame.surfarray.make_surface(frame_rgb.swapaxes(0, 1))
                 self.screen.blit(frame_surface, (40, 120))
                 
-                # Choose circle color based on hand detection status
-                # circle_color = self.DARK_GRAY  # Default color - no hand
-                # if self.hand_detected:
-                #     if self.ready_for_detection:
-                #         circle_color = self.GREEN  # Green - hand positioned and ready
-                #     else:
-                #         circle_color = self.CYAN  # Cyan - hand detected but not ready
-                
-                # # Draw detection circle overlay with status-based color
-                # pygame.draw.circle(self.screen, circle_color, (270, 287), 100, 2)
-                
                 # Draw hand landmarks if available with status-based color
                 if self.hand_landmarks:
-                    # This is simplified - in a real application you'd need to transform
-                    # the landmarks to match the displayed frame size
                     landmark_color = self.GREEN if self.ready_for_detection else self.CYAN
                     for landmarks in self.hand_landmarks:
                         for landmark in landmarks.landmark:
@@ -434,7 +437,7 @@ class ASLDetectionSystem:
         self.draw_rounded_rect(self.screen, (20, 495, 760, 85), self.WHITE, 0.1)
         
         # Title
-        history_title = self.small_font.render('Accumulated Text:', True, self.BLACK)
+        history_title = self.small_font.render('Text:', True, self.BLACK)
         self.screen.blit(history_title, (40, 510))
         
         # Draw accumulated string
@@ -466,7 +469,7 @@ class ASLDetectionSystem:
         self.screen.blit(back_text, back_rect)
         
         # Instructions
-        instructions = self.small_font.render('Press C to clear, B to backspace, Q to quit', True, self.DARK_GRAY)
+        instructions = self.small_font.render('Press Enter to see result, Press C to clear, B to backspace, Q to quit', True, self.DARK_GRAY)
         self.screen.blit(instructions, (40, 570))
     
     def handle_events(self):
@@ -477,30 +480,53 @@ class ASLDetectionSystem:
                 return False
             
             elif event.type == MOUSEBUTTONDOWN:
-                # Check if practice mode button is clicked
-                if pygame.Rect(600, 35, 160, 30).collidepoint(event.pos):
-                    self.practice_mode = not self.practice_mode
                 
                 # Check if clear button is clicked
                 if pygame.Rect(650, 515, 60, 25).collidepoint(event.pos):
                     self.accumulated_string = ""
+                    # Reset the Confidence Counter
+                    self.confidence_counter["asl"] = 0
+                    self.confidence_counter["dgs"] = 0
+                    self.confidence_counter["lse"] = 0
                 
                 # Check if backspace button is clicked
                 if pygame.Rect(720, 515, 40, 25).collidepoint(event.pos):
                     self.accumulated_string = self.accumulated_string[:-1] if self.accumulated_string else ""
+                    # Update the Confidence Counter
+                    self.confidence_counter = self.update_count(self.confidence_counter)
+                    self.lang_history.pop()
             
             elif event.type == KEYDOWN:
                 # Clear text with 'c'
                 if event.key == K_c:
                     self.accumulated_string = ""
+                    # Reset the Confidence Counter
+                    self.confidence_counter["asl"] = 0
+                    self.confidence_counter["dgs"] = 0
+                    self.confidence_counter["lse"] = 0
                 
                 # Backspace with 'b'
                 elif event.key == K_b:
                     self.accumulated_string = self.accumulated_string[:-1] if self.accumulated_string else ""
-                
-                # Toggle practice mode with 'p'
-                elif event.key == K_p:
-                    self.practice_mode = not self.practice_mode
+                    # Update the Confidence Counter
+                    self.confidence_counter = self.update_count(self.confidence_counter)
+                    self.lang_history.pop()
+
+                elif event.key == K_RETURN:
+                    if self.accumulated_string != "":
+                        self.probable_language = max(self.confidence_counter, key= self.confidence_counter.get)
+                        self.isoCode = self.iso.get(self.probable_language)
+                        text = NLPpipeline(self.accumulated_string, self.isoCode)
+                        if text != self.accumulated_string:
+                            self.accumulated_string = text
+                        else:
+                            self.accumulated_string = "Error: Could not find the words. Press C to CLear"
+                        # Reset the Confidence Counter
+                        self.confidence_counter["asl"] = 0
+                        self.confidence_counter["dgs"] = 0
+                        self.confidence_counter["lse"] = 0
+                        # Reset ISO to default
+                        self.isoCode = "en"
                 
                 # Exit with Escape or 'q'
                 elif event.key == K_ESCAPE or event.key == K_q:
@@ -509,6 +535,71 @@ class ASLDetectionSystem:
         
         return True
     
+    def update_count(self, dict_counter):
+        """Update the Confidence Counter when Backspace is used"""
+        key_1 = "asl"
+        key_2 = "dgs"
+        key_3 = "lse"
+        idx = len(self.lang_history) - 1
+        lang = self.lang_history[idx]
+        if '/' not in lang:
+            if key_1 in lang:
+                dict_counter[key_1] -= 1
+            if key_2 in lang:
+                dict_counter[key_2] -= 1
+            if key_3 in lang:
+                dict_counter[key_3] -= 1
+        else:
+            languages = lang.split("/")
+            for i in languages:
+                if key_1 in languages:
+                    dict_counter[key_1] -= 1/len(languages)
+                if key_2 in languages:
+                    dict_counter[key_2] -= 1/len(languages)
+                if key_3 in languages:
+                    dict_counter[key_3] -= 1/len(languages)
+
+        return dict_counter
+
+    def extract_and_count(self, prediction, dict_counter):
+        """Extract Languages from Class names and increment the confidence counter"""
+        start = None
+        depth = 0
+        key_1 = "asl"
+        key_2 = "dgs"
+        key_3 = "lse"
+        text_in_paranthesis = None
+        for i, char in enumerate(prediction):
+            if char == '(':
+                if depth == 0:
+                    start = i +1
+                depth +=1
+            elif char == ')':
+                depth -= 1
+                if depth == 0 and start is not None:
+                    text_in_paranthesis = prediction[start:i] 
+        
+        self.lang_history.append(text_in_paranthesis)
+
+        if '/' not in text_in_paranthesis:
+            if key_1 in text_in_paranthesis:
+                dict_counter[key_1] += 1
+            if key_2 in text_in_paranthesis:
+                dict_counter[key_2] += 1
+            if key_3 in text_in_paranthesis:
+                dict_counter[key_3] += 1
+        else:
+            languages = text_in_paranthesis.split("/")
+            for i in languages:
+                if key_1 in languages:
+                    dict_counter[key_1] += 1/len(languages)
+                if key_2 in languages:
+                    dict_counter[key_2] += 1/len(languages)
+                if key_3 in languages:
+                    dict_counter[key_3] += 1/len(languages)
+
+        return dict_counter
+
     def process_frame(self, frame):
         """Process a camera frame and update detection"""
         # Preprocess frame for model input
@@ -531,6 +622,7 @@ class ASLDetectionSystem:
             self.is_waiting = False
             self.last_letter = ""
         
+
         # Run prediction only if hand is detected AND ready for detection
         if hand_crop is not None and hand_crop.size > 0 and self.ready_for_detection:
             # Get model prediction
@@ -553,16 +645,13 @@ class ASLDetectionSystem:
                     self.last_prediction_time = current_time
                     self.last_letter = ""
                 elif not self.is_waiting and self.current_detection != self.last_letter:
+                    self.confidence_counter = self.extract_and_count(self.current_detection ,self.confidence_counter)
                     self.accumulated_string += self.current_detection[0]
                     self.last_letter = self.current_detection
                     self.is_waiting = True
                     self.last_prediction_time = current_time
                     self.waiting_message = f"Wait: {self.prediction_delay}s"
-                    
-                    # Update detection history
-                    # if len(self.detection_history) > 9:
-                    #     self.detection_history.pop(0)
-                    # self.detection_history.append(self.current_detection[0])
+
             else:
                 self.current_detection = "Uncertain"
         elif hand_crop is not None and hand_crop.size > 0:

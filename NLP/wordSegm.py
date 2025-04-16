@@ -14,7 +14,7 @@ def getLangPath(fileName, language=None):
     if language is None or language not in supportedLanguages:
     #base case fall back  -- english 
         language = "en" 
-    directory = os.path.join("Languages", language)
+    directory = os.path.join("NLP", "Languages", language)
     #another fall back make dir if no exist, # debug too 
     os.makedirs(directory,exist_ok=True)
     return os.path.join(directory, fileName)
