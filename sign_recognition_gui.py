@@ -4,9 +4,13 @@ import tensorflow as tf
 import mediapipe as mp
 import pygame
 import sys
+import os
 import time
 from pygame.locals import *
+sys.path.append(os.path.join(os.path.dirname(__file__), 'NLP'))
 from pipeline import NLPpipeline
+# from NLP.pipeline import *
+ 
 
 class ASLDetectionSystem:
     def __init__(self, width=800, height=600, model_path="models\\full_model_combined_classes.h5"): 
@@ -76,9 +80,22 @@ class ASLDetectionSystem:
         self.waiting_message = ""
         self.no_hand_count = 0
         self.confidence_threshold = 0.7
-        
+
+        # NLP variables
+        self.confidence_counter = {
+            "asl" : 0,
+            "dgs" : 0,
+            "lse" : 0
+        }
+        self.iso = {
+            "asl" : "en",
+            "dgs" : "de",
+            "lse" : "es"
+        }
+        self.probable_language = None
+        self.isoCode = "en"
         # Practice mode
-        self.practice_mode = False
+        # self.practice_mode = False
         
         # Main clock
         self.clock = pygame.time.Clock()
@@ -290,7 +307,7 @@ class ASLDetectionSystem:
         self.screen.blit(title, (40, 36))
 
         # Instructions
-        instructions = self.small_font.render('Press C to clear, B to backspace, Q to quit', True, self.DARK_GRAY)
+        instructions = self.small_font.render('Press Enter to see result, Press C to clear, B to backspace, Q to quit', True, self.DARK_GRAY)
         self.screen.blit(instructions, (40, 570))
     
     def draw_camera_feed(self, frame):
@@ -424,7 +441,7 @@ class ASLDetectionSystem:
         self.draw_rounded_rect(self.screen, (20, 495, 760, 85), self.WHITE, 0.1)
         
         # Title
-        history_title = self.small_font.render('Accumulated Text:', True, self.BLACK)
+        history_title = self.small_font.render('Text:', True, self.BLACK)
         self.screen.blit(history_title, (40, 510))
         
         # Draw accumulated string
@@ -468,8 +485,8 @@ class ASLDetectionSystem:
             
             elif event.type == MOUSEBUTTONDOWN:
                 # Check if practice mode button is clicked
-                if pygame.Rect(600, 35, 160, 30).collidepoint(event.pos):
-                    self.practice_mode = not self.practice_mode
+                # if pygame.Rect(600, 35, 160, 30).collidepoint(event.pos):
+                #     self.practice_mode = not self.practice_mode
                 
                 # Check if clear button is clicked
                 if pygame.Rect(650, 515, 60, 25).collidepoint(event.pos):
@@ -483,14 +500,26 @@ class ASLDetectionSystem:
                 # Clear text with 'c'
                 if event.key == K_c:
                     self.accumulated_string = ""
+                    self.confidence_counter["asl"] = 0
+                    self.confidence_counter["dgs"] = 0
+                    self.confidence_counter["lse"] = 0
                 
                 # Backspace with 'b'
                 elif event.key == K_b:
                     self.accumulated_string = self.accumulated_string[:-1] if self.accumulated_string else ""
                 
                 # Toggle practice mode with 'p'
-                elif event.key == K_p:
-                    self.practice_mode = not self.practice_mode
+                # elif event.key == K_p:
+                #     self.practice_mode = not self.practice_mode
+
+                elif event.key == K_RETURN:
+                    self.probable_language = max(self.confidence_counter, key= self.confidence_counter.get)
+                    self.isoCode = self.iso.get(self.probable_language)
+                    self.accumulated_string, _, _ = NLPpipeline(self.accumulated_string, self.isoCode)
+                    print(self.accumulated_string)
+                    self.confidence_counter["asl"] = 0
+                    self.confidence_counter["dgs"] = 0
+                    self.confidence_counter["lse"] = 0
                 
                 # Exit with Escape or 'q'
                 elif event.key == K_ESCAPE or event.key == K_q:
@@ -502,9 +531,9 @@ class ASLDetectionSystem:
     def extractAndcount(self, prediction, dict_counter):
         start = None
         depth = 0
-        key_a = "a"
-        key_d = "d"
-        key_e = "e"
+        key_1 = "asl"
+        key_2 = "dgs"
+        key_3 = "lse"
         text_in_paranthesis = None
         for i, char in enumerate(prediction):
             if char == '(':
@@ -517,20 +546,21 @@ class ASLDetectionSystem:
                     text_in_paranthesis = prediction[start:i] 
         
         if '/' not in text_in_paranthesis:
-            if 'a' in text_in_paranthesis:
-                dict_counter[key_a] += 1
-            if 'd' in text_in_paranthesis:
-                dict_counter[key_d] += 1
-            if 'e' in text_in_paranthesis:
-                dict_counter[key_e] += 1
+            if key_1 in text_in_paranthesis:
+                dict_counter[key_1] += 1
+            if key_2 in text_in_paranthesis:
+                dict_counter[key_2] += 1
+            if key_3 in text_in_paranthesis:
+                dict_counter[key_3] += 1
         else:
             languages = text_in_paranthesis.split("/")
-            if 'a' in languages:
-                dict_counter[key_a] += 1
-            if 'd' in languages:
-                dict_counter[key_d] += 1
-            if 'e' in languages:
-                dict_counter[key_e] += 1
+            for i in languages:
+                if key_1 in languages:
+                    dict_counter[key_1] += 1
+                if key_2 in languages:
+                    dict_counter[key_2] += 1
+                if key_3 in languages:
+                    dict_counter[key_3] += 1
 
         return dict_counter
 
@@ -556,11 +586,6 @@ class ASLDetectionSystem:
             self.is_waiting = False
             self.last_letter = ""
         
-        confidence_counter = {
-            "a" : 0,
-            "d" :0,
-            "e" :0
-        }
 
         # Run prediction only if hand is detected AND ready for detection
         if hand_crop is not None and hand_crop.size > 0 and self.ready_for_detection:
@@ -584,12 +609,12 @@ class ASLDetectionSystem:
                     self.last_prediction_time = current_time
                     self.last_letter = ""
                 elif not self.is_waiting and self.current_detection != self.last_letter:
+                    self.confidence_counter = self.extractAndcount(self.current_detection ,self.confidence_counter)
                     self.accumulated_string += self.current_detection[0]
                     self.last_letter = self.current_detection
                     self.is_waiting = True
                     self.last_prediction_time = current_time
                     self.waiting_message = f"Wait: {self.prediction_delay}s"
-                    confidence_counter = extractAndcount(self.current_detection ,confidence_counter)
 
             else:
                 self.current_detection = "Uncertain"
