@@ -20,8 +20,8 @@ def NLPpipeline(text, language=None):
         if correctedWords is None: # if terrible spelling or nothing exist (slang) return itself 
             correctedWords = segmentedWords
         
-        #avoid join errors, none afterwards --> empty ""
-        correctedWords = [word if word is not None else "" for word in correctedWords] # chhat wrote this line 
+        #avoid join errors, none afterwards --> should return same string if nothing changes
+        correctedWords = [word if word is not None else text  for word in correctedWords] # chhat wrote this line 
         # print(f" correction: {' '.join(correctedWords)}")
     except Exception as e:
         print(f"Correction error: {e}")
@@ -34,18 +34,25 @@ def NLPpipeline(text, language=None):
     probability, bestPath = hmm.viterbi(correctedWords)
     # print(f"HMM path: {' '.join(bestPath)}")
     #print(f"path probability: {probability}")
+
+    sentence = " ".join(correctedWords)
+    return sentence
     
-    return correctedWords, bestPath, probability
+    #return correctedWords #, bestPath, probability # better if it just return our corrected word 
 
 
 if __name__ == "__main__":
     rawWords = [
         "latsgo",
         "igofst",
-        "iloveyo"
+        "iloveyo",
+        "iamwll"
     ]
     
     for test in rawWords:
         print(f"\n '{test}'")
-        corrected, path, prob = NLPpipeline(test)
-        print(f" result: '{' '.join(corrected)}'")
+        
+        #corrected, path, prob = NLPpipeline(test)
+        answer = NLPpipeline(test)
+        #print(f" result: '{' '.join(corrected)}'")
+        print(answer)
