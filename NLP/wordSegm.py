@@ -114,7 +114,7 @@ def textSegmentation(text, language=None, wordProb=None, transProb=None):
 
     # if no exist just return given text -- else (87) we return best segmentaiton 
     if table[textLength][0] == non_valid_score:
-        result = []
+        result = [] # pssoibe issue 
         i = 0 
         while i < textLength:
             bestWord = None
