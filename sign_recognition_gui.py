@@ -458,18 +458,23 @@ class ASLDetectionSystem:
             pygame.draw.rect(self.screen, self.BLACK, (cursor_x, 535, 2, 30))
         
         # Action buttons
-        self.draw_rounded_rect(self.screen, (650, 515, 60, 25), self.BLUE, 0.5)
+        self.draw_rounded_rect(self.screen, (650, 530, 60, 40), self.BLUE, 0.5)
         clear_text = self.small_font.render('Clear', True, self.WHITE)
-        clear_rect = clear_text.get_rect(center=(680, 527))
+        clear_rect = clear_text.get_rect(center=(680, 550))
         self.screen.blit(clear_text, clear_rect)
         
-        self.draw_rounded_rect(self.screen, (720, 515, 40, 25), self.BLUE, 0.5)
+        self.draw_rounded_rect(self.screen, (720, 530, 40, 40), self.BLUE, 0.5)
         back_text = self.small_font.render('←', True, self.WHITE)
-        back_rect = back_text.get_rect(center=(740, 527))
+        back_rect = back_text.get_rect(center=(740, 550))
         self.screen.blit(back_text, back_rect)
         
+        self.draw_rounded_rect(self.screen, (580, 530, 60, 40), self.GREEN, 0.5)
+        enter_text = self.small_font.render('Enter', True, self.WHITE)
+        enter_rect = enter_text.get_rect(center=(610, 550))
+        self.screen.blit(enter_text, enter_rect)
+
         # Instructions
-        instructions = self.small_font.render('Press Enter to see result, Press C to clear, B to backspace, Q to quit', True, self.DARK_GRAY)
+        instructions = self.small_font.render('Press Enter to see NLP result, Press C to clear, B to backspace, Q to quit', True, self.DARK_GRAY)
         self.screen.blit(instructions, (40, 570))
     
     def handle_events(self):
@@ -482,19 +487,38 @@ class ASLDetectionSystem:
             elif event.type == MOUSEBUTTONDOWN:
                 
                 # Check if clear button is clicked
-                if pygame.Rect(650, 515, 60, 25).collidepoint(event.pos):
+                if pygame.Rect(650, 530, 60, 40).collidepoint(event.pos):
                     self.accumulated_string = ""
                     # Reset the Confidence Counter
                     self.confidence_counter["asl"] = 0
                     self.confidence_counter["dgs"] = 0
                     self.confidence_counter["lse"] = 0
+                    # Reset ISO to default
+                    self.isoCode = "en"
                 
                 # Check if backspace button is clicked
-                if pygame.Rect(720, 515, 40, 25).collidepoint(event.pos):
+                if pygame.Rect(720, 530, 40, 40).collidepoint(event.pos):
                     self.accumulated_string = self.accumulated_string[:-1] if self.accumulated_string else ""
                     # Update the Confidence Counter
                     self.confidence_counter = self.update_count(self.confidence_counter)
                     self.lang_history.pop()
+
+                # Check if enter button is clicked (new)
+                if pygame.Rect(580, 530, 60, 40).collidepoint(event.pos):
+                    if self.accumulated_string != "":
+                        self.probable_language = max(self.confidence_counter, key=self.confidence_counter.get)
+                        self.isoCode = self.iso.get(self.probable_language)
+                        text = NLPpipeline(self.accumulated_string, self.isoCode)
+                        if text != self.accumulated_string:
+                            self.accumulated_string = text
+                        else:
+                            self.accumulated_string = "Error: Could not find the words. Press C to Clear"
+                        # Reset the Confidence Counter
+                        self.confidence_counter["asl"] = 0
+                        self.confidence_counter["dgs"] = 0
+                        self.confidence_counter["lse"] = 0
+                        # Reset ISO to default
+                        self.isoCode = "en"
             
             elif event.type == KEYDOWN:
                 # Clear text with 'c'
@@ -504,6 +528,8 @@ class ASLDetectionSystem:
                     self.confidence_counter["asl"] = 0
                     self.confidence_counter["dgs"] = 0
                     self.confidence_counter["lse"] = 0
+                    # Reset ISO to default
+                    self.isoCode = "en"
                 
                 # Backspace with 'b'
                 elif event.key == K_b:
