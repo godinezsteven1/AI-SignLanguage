@@ -44,12 +44,12 @@ python hand_tracking.py
 If everything is set up correctly, you should see a window showing hand tracking in real time.
 
 ## Running the Project
-Once you’ve set up the environment, you can start working on the project by running the appropriate scripts:
-- `hand_tracking.py`: For hand tracking and feature extraction.
-- Other scripts for data preparation, model training, and NLP integration will be added as development progresses.
+```bash
+python sign_recognition_gui.py
+```
 
 ------ 
-## Environment Variables Setup
+## Environment Variables Setup -- Runing the Reddit Scrapper on your own!
 
 This project uses environment variables for sensitive configuration. A template file `.env.example` is provided in the repository. Follow these steps to create your own `.env` file:
 
