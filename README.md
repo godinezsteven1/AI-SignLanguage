@@ -1,5 +1,11 @@
 # AI Sign Language Project
 
+## DEMO 
+Below is a basic demo of the project using ASL! Enjoy <3
+
+![Demo on Imgur](TBI)
+
+
 ## Overview
 This project aims to recognize and translate sign languages using a CNN model (LSTM). It leverages TensorFlow, Mediapipe, and NLP for feature extraction, model training, and text correction.
 
@@ -54,6 +60,7 @@ python sign_recognition_gui.py
 ## Environment Variables Setup -- Runing the Reddit Scrapper on your own!
 
 This project uses environment variables for sensitive configuration. A template file `.env.example` is provided in the repository. Follow these steps to create your own `.env` file:
+Where CLIENT_ID, CLIENT_SECRET, and USER_AGENT is found at 'https://www.reddit.com/prefs/apps' by creating your own API app key under _YOUR_ account.
 
 1. **Copy the template file:**
 
