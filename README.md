@@ -75,14 +75,14 @@ The model successfully recognizes and classifies signs in real-time across multi
 ### 🔤 Sign Language Recognition Output
 
 #### 🇺🇸 American Sign Language (ASL)
-Recognizing the ASL sign for the letter “A”:
+Recognizing the ASL:
 ![ASL Result]([https://user-images.githubusercontent.com/.../asl_result.gif](https://github.com/godinezsteven1/AI-SignLanguage/issues/24))
 
 #### 🇩🇪 German Sign Language (DGS)
-Recognizing the DGS sign for the letter “B”:
+Recognizing the DGS :
 ![DGS Result]([https://user-images.githubusercontent.com/.../dgs_result.gif](https://github.com/godinezsteven1/AI-SignLanguage/issues/26))
 
 #### 🇪🇸 Spanish Sign Language (LSE)
-Recognizing the LSE sign for the letter “C”:
+Recognizing the LSE :
 ![LSE Result]([https://user-images.githubusercontent.com/.../lse_result.gif](https://github.com/godinezsteven1/AI-SignLanguage/issues/25))
    
