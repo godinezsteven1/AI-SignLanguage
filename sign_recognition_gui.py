@@ -13,7 +13,7 @@ from collections import deque
  
 
 class ASLDetectionSystem:
-    def __init__(self, width=800, height=600, model_path="models/full_model_combined_classes.h5"): 
+    def __init__(self, width=800, height=600, model_path="models\\full_model_combined_classes.h5"): 
         # Initialize pygame
         pygame.init()
         pygame.font.init()
