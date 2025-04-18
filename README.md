@@ -38,6 +38,7 @@ pip install -r requirements.txt
 To make sure everything is working, try running the `hand_tracking.py` script to ensure TensorFlow and Mediapipe are installed correctly.
 
 ```bash
+cd scripts
 python hand_tracking.py
 ```
 
