@@ -8,17 +8,28 @@ import math
 from collections import defaultdict
 import os
 
+
+
+#print(f"[HMM loaded] __file__ = {os.path.abspath(__file__)}") # debug 
+
 startFileName="startProb.json"
 transFileName="transitionProb.json"
 
 #abstraction for sliglty easier stuff 
 supportedLanguages = ["en", "es", "de"]
+
+
 def getLangPath(fileName, language=None):
     if language is None or language not in supportedLanguages: # english, spanish, german 
         language = "en"  #fall back to english 
-    directory = os.path.join("NLP", "Languages",language)
-    os.makedirs(directory, exist_ok=True) #creates dir if no exist, kind of nice debugger
-    return os.path.join(directory, fileName)
+    #directory = os.path.join("NLP", "Languages",language)
+    #os.makedirs(directory, exist_ok=True) #creates dir if no exist, kind of nice debugger
+    baseDir = os.path.dirname(os.path.abspath(__file__))
+    directory = os.path.join(baseDir, "Languages", language)
+    path  = os.path.join(directory, fileName)
+    #print(f"[getLangPath] file={fileName!r}, lang={language!r} ->  {path}") # debug 
+    
+    return path
 
 
 

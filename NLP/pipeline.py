@@ -46,7 +46,8 @@ if __name__ == "__main__":
         "latsgo",
         "igofst",
         "iloveyo",
-        "iamwll"
+        "iamwll",
+        "iloveyou"
     ]
     
     for test in rawWords:

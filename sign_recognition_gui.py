@@ -509,10 +509,12 @@ class ASLDetectionSystem:
                         self.probable_language = max(self.confidence_counter, key=self.confidence_counter.get)
                         self.isoCode = self.iso.get(self.probable_language)
                         text = NLPpipeline(self.accumulated_string, self.isoCode)
-                        if text != self.accumulated_string:
-                            self.accumulated_string = text
-                        else:
-                            self.accumulated_string = "Error: Could not find the words. Press C to Clear"
+                        #if text != self.accumulated_string:
+                        #    self.accumulated_string = text
+                        #else:
+                        #    self.accumulated_string = "Error: Could not find the words. Press C to Clear"
+                        text_out = NLPpipeline(self.accumulated_string, self.isoCode)
+                        self.accumulated_string = text_out
                         # Reset the Confidence Counter
                         self.confidence_counter["asl"] = 0
                         self.confidence_counter["dgs"] = 0
