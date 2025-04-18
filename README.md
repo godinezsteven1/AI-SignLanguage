@@ -68,5 +68,21 @@ POST_LIMIT=NUMBER_LIMIT_HERE
 ```
 In order to get this information please go on Reddit, click on your avatar → User Settings → scroll down to the "Apps" section. You can manage and create apps from there.
 
- 
+ ## Results
+
+The model successfully recognizes and classifies signs in real-time across multiple sign languages.
+
+### 🔤 Sign Language Recognition Output
+
+#### 🇺🇸 American Sign Language (ASL)
+Recognizing the ASL sign for the letter “A”:
+![ASL Result]([https://user-images.githubusercontent.com/.../asl_result.gif](https://github.com/godinezsteven1/AI-SignLanguage/issues/24))
+
+#### 🇩🇪 German Sign Language (DGS)
+Recognizing the DGS sign for the letter “B”:
+![DGS Result]([https://user-images.githubusercontent.com/.../dgs_result.gif](https://github.com/godinezsteven1/AI-SignLanguage/issues/26))
+
+#### 🇪🇸 Spanish Sign Language (LSE)
+Recognizing the LSE sign for the letter “C”:
+![LSE Result]([https://user-images.githubusercontent.com/.../lse_result.gif](https://github.com/godinezsteven1/AI-SignLanguage/issues/25))
    
