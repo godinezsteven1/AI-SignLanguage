@@ -3,7 +3,7 @@
 ## DEMO 
 Below is a basic demo of the project using ASL! Enjoy <3
 
-![Demo on Imgur](TBI)
+![Demo on Imgur](assets/demo.gif)
 
 
 ## Overview
