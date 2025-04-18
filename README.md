@@ -45,6 +45,7 @@ python hand_tracking.py
 If everything is set up correctly, you should see a window showing hand tracking in real time.
 
 ## Running the Project
+In the root directory:
 ```bash
 python sign_recognition_gui.py
 ```
