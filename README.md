@@ -83,12 +83,12 @@ The model successfully recognizes and classifies signs in real-time across multi
 
 ### Sign Language Recognition Output
 
-#### 🇺🇸 American Sign Language (ASL)
+#### American Sign Language (ASL)
 ![ASL Result](assets/ASL.gif)
 
-#### 🇩🇪 German Sign Language (DGS)
+#### German Sign Language (DGS)
 ![DGS Result](assets/DGS.gif)
 
-#### 🇪🇸 Spanish Sign Language (LSE)
+#### Spanish Sign Language (LSE)
 ![LSE Result](assets/LSE.gif)
    
